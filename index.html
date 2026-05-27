@@ -343,8 +343,19 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <button class="bnb" id="bnb-ingredientes" onclick="goTab('ingredientes')"><span class="icon">📦</span><span class="lbl">Inventario</span></button>
   <button class="bnb" id="bnb-conteo" onclick="goTab('conteo')"><span class="icon">📝</span><span class="lbl">Conteo</span></button>
   <button class="bnb" id="bnb-compra" onclick="goTab('compra')"><span class="icon">🛒</span><span class="lbl">Compra</span></button>
-  <button class="bnb" id="bnb-historial" onclick="goTab('historial')"><span class="icon">🕐</span><span class="lbl">Movim.</span></button>
+  <button class="bnb" id="bnb-mas" onclick="openMobileMore()"><span class="icon">⋯</span><span class="lbl">Más</span></button>
 </nav>
+
+<!-- MODAL: MENÚ MÁS (móvil) -->
+<div class="modal-backdrop" id="modal-mobile-more">
+<div class="modal" style="max-width:420px">
+  <div class="modal-header">
+    <h2>Más opciones</h2>
+    <button class="close-btn" onclick="closeModal('modal-mobile-more')">✕</button>
+  </div>
+  <div id="mobile-more-list" style="display:flex;flex-direction:column;gap:.5rem"></div>
+</div>
+</div>
 <div class="main">
 
 <!-- DASHBOARD -->
@@ -498,7 +509,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div style="margin-bottom:.75rem">
     <div class="sb" style="margin-bottom:.5rem">
       <div><h2>Conteo Semanal</h2><span style="font-size:12px;color:var(--text2)">Toca un ingrediente para actualizar su stock</span></div>
-      <button class="btn btn-success btn-sm" onclick="guardarConteo()" title="Guardar todos los cambios">✓ Guardar</button>
+      <div style="display:flex;gap:.4rem">
+        <button class="btn btn-ghost btn-sm" onclick="abrirTutorialConteo()" title="¿Cómo funciona el conteo?">ℹ Tutorial</button>
+        <button class="btn btn-success btn-sm" onclick="guardarConteo()" title="Guardar todos los cambios">✓ Guardar</button>
+      </div>
     </div>
     <div style="display:flex;gap:.5rem;align-items:center">
       <div id="conteo-dia-badge" style="flex:1;padding:.5rem .75rem;border-radius:8px;font-size:13px;font-weight:600"></div>
@@ -556,6 +570,126 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
 
   <div id="compra-contenido"></div>
+</div>
+
+<!-- MODAL: INFO VALORIZADO -->
+<div class="modal-backdrop" id="modal-info-valorizado">
+<div class="modal" style="max-width:480px">
+  <div class="modal-header">
+    <div>
+      <h2 style="display:flex;align-items:center;gap:8px">💎 Valor del inventario</h2>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">¿De dónde sale este número?</div>
+    </div>
+    <button class="close-btn" onclick="closeModal('modal-info-valorizado')">✕</button>
+  </div>
+
+  <div style="font-size:13px;line-height:1.55;color:var(--text)">
+    <p style="margin-bottom:.75rem">El sistema multiplica <strong style="color:var(--accent)">stock actual × precio</strong> de cada ingrediente y suma todo.</p>
+
+    <div class="sl" style="margin-bottom:6px">¿De dónde saca el precio?</div>
+    <div style="background:var(--bg3);border-radius:9px;padding:.75rem 1rem;margin-bottom:.75rem">
+      <ol style="padding-left:18px;margin:0;font-size:13px;line-height:1.6">
+        <li><strong>Primero:</strong> si el ingrediente tiene un campo <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px">precio</code> definido, lo usa.</li>
+        <li><strong>Segundo:</strong> busca en <strong style="color:var(--accent)">Costos → Materias Primas</strong> por nombre (exacto o parcial). Ej: "Tomate" del Inventario hace match con "Tomate" en MP.</li>
+        <li><strong>Tercero:</strong> busca en <strong style="color:var(--accent)">Costos → Preparaciones</strong> por nombre. Ej: "Carnitas" en Inventario hace match con la preparación "Carnitas" — usa el costo de la tanda ÷ peso para sacar el $/kg.</li>
+        <li><strong>Si no encuentra nada:</strong> ese ingrediente no suma al valor y aparece en "<span style="color:var(--yellow)">N sin precio</span>".</li>
+      </ol>
+    </div>
+
+    <div class="sl" style="margin-bottom:6px">¿Cómo mejorar la precisión?</div>
+    <div style="background:var(--bg3);border-radius:9px;padding:.75rem 1rem;margin-bottom:.75rem">
+      <ul style="padding-left:18px;margin:0;font-size:13px;line-height:1.6">
+        <li>Para <strong>materias primas</strong> (tomate, queso, etc): que el nombre en Inventario sea igual al de Costos → Materias Primas.</li>
+        <li>Para <strong>preparaciones</strong> (Carnitas, Pollo, Salsa Verde, etc): que el nombre en Inventario sea igual al de Costos → Preparaciones.</li>
+        <li>Mantén actualizados los precios de Materias Primas — afecta directo el costo de cada preparación.</li>
+        <li>Si un ingrediente aparece en "sin precio", agrégalo en Materias Primas o Preparaciones según corresponda.</li>
+      </ul>
+    </div>
+
+    <div style="background:var(--accent-bg);border:.5px solid var(--accent-dim);border-radius:9px;padding:.75rem 1rem">
+      <div class="sl" style="color:var(--accent);margin-bottom:4px">📝 Importante</div>
+      <div style="font-size:12px;color:var(--text)">Este número es un <strong>estimado de referencia</strong>, no contable. Sirve para tener una idea del capital inmovilizado en bodega.</div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;margin-top:1.25rem">
+    <button class="btn btn-primary" onclick="closeModal('modal-info-valorizado')">Entendido</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL: TUTORIAL CONTEO EXPRESS -->
+<div class="modal-backdrop" id="modal-tutorial-conteo">
+<div class="modal" style="max-width:500px">
+  <div class="modal-header">
+    <div>
+      <h2 style="display:flex;align-items:center;gap:8px">⚡ Cómo hacer el Conteo</h2>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Guía paso a paso</div>
+    </div>
+    <button class="close-btn" onclick="closeModal('modal-tutorial-conteo')">✕</button>
+  </div>
+
+  <div style="font-size:13px;line-height:1.55;color:var(--text)">
+    <!-- Paso 1 -->
+    <div style="display:flex;gap:.85rem;margin-bottom:1rem">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">Toca "⚡ Modo Express"</div>
+        <div style="font-size:12px;color:var(--text2)">El botón naranja arriba de la lista. El sistema te va a mostrar <strong>un ingrediente a la vez</strong>, en orden, para que no se te olvide ninguno.</div>
+      </div>
+    </div>
+
+    <!-- Paso 2 -->
+    <div style="display:flex;gap:.85rem;margin-bottom:1rem">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">Cuenta físicamente el ingrediente</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Ve a la bodega, pesa/cuenta el ingrediente que aparece en pantalla. Arriba ves el stock anterior para comparar.</div>
+        <div style="background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--text2)">💡 <strong>Tip:</strong> Si no contaste algo o no es momento, toca "Sin cambios →" para saltarlo.</div>
+      </div>
+    </div>
+
+    <!-- Paso 3 -->
+    <div style="display:flex;gap:.85rem;margin-bottom:1rem">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">Escribe el número real</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Toca el campo grande del medio y escribe la cantidad que contaste. Verás la diferencia abajo (<span style="color:var(--green)">↑ subió</span> o <span style="color:var(--red)">↓ bajó</span>).</div>
+        <div style="background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--text2)">💡 <strong>Atajos:</strong> usa <strong>−5 / −1 / +1 / +5</strong> para ajustes rápidos sin teclear.</div>
+      </div>
+    </div>
+
+    <!-- Paso 4 -->
+    <div style="display:flex;gap:.85rem;margin-bottom:1rem">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">Toca "Guardar y siguiente →"</div>
+        <div style="font-size:12px;color:var(--text2)">El sistema avanza al siguiente ingrediente automáticamente. Arriba ves la barra de progreso <strong>(ej: 5/19)</strong>.</div>
+      </div>
+    </div>
+
+    <!-- Paso 5 -->
+    <div style="display:flex;gap:.85rem;margin-bottom:1rem">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">5</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">Al terminar, toca el botón verde abajo</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">El sistema cierra el modal solo. Verás todas las tarjetas que tocaste en <strong style="color:#0ea5e9">azul</strong> con la diferencia. Abajo aparece:</div>
+        <div style="background:#15803D;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;text-align:center">✓ Guardar conteo (17 cambios)</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">Tócalo y se sube todo a Firebase. Listo.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--accent-bg);border:.5px solid var(--accent-dim);border-radius:9px;padding:.75rem 1rem;margin-top:1rem">
+      <div class="sl" style="color:var(--accent);margin-bottom:4px">⏱ Tiempo estimado</div>
+      <div style="font-size:12px;color:var(--text)">Un conteo completo en Modo Express toma <strong>8 a 12 minutos</strong>. Mucho más rápido que el cuaderno.</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem">
+    <button class="btn btn-ghost" onclick="closeModal('modal-tutorial-conteo')">Cerrar</button>
+    <button class="btn btn-primary" onclick="closeModal('modal-tutorial-conteo');goTab('conteo');setTimeout(()=>conteoExpressStart(),250)">▶ Empezar ahora</button>
+  </div>
+</div>
 </div>
 
 <!-- MODAL DETALLE DE INGREDIENTE -->
@@ -1106,6 +1240,11 @@ function aplicarRol() {
   if (uname) uname.textContent = esAdmin ? 'Administrador' : 'Cocina';
   if (urol) urol.textContent = esAdmin ? 'Admin · acceso total' : 'Operación diaria';
   if (avat) avat.textContent = esAdmin ? '👑' : '🍳';
+  // Hide sidebar items que son solo admin
+  ['historial','reportes','costos'].forEach(tab => {
+    const el = document.querySelector(`.sidebar-item[data-tab="${tab}"]`);
+    if (el) el.style.display = esAdmin ? '' : 'none';
+  });
   document.getElementById('btn-ingrediente').style.display = esAdmin ? '' : 'none';
   document.getElementById('btn-movimiento').style.display = '';
   const tabsEl = document.querySelectorAll('.tab');
@@ -1266,6 +1405,9 @@ function goTab(t) {
     const btn = document.getElementById('bnb-'+tab);
     if (btn) btn.classList.toggle('active', tab===t);
   });
+  // Si la tab no tiene bnb propio (reportes/costos/historial), marcar "Más"
+  const masBtn = document.getElementById('bnb-mas');
+  if (masBtn) masBtn.classList.toggle('active', ['historial','reportes','costos'].includes(t));
   // Sidebar items
   document.querySelectorAll('.sidebar-item').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === t);
@@ -1282,6 +1424,39 @@ function goTab(t) {
   } catch(e){}
 }
 window.goTab = goTab;
+
+// Menú "Más" para móvil — muestra opciones que no caben en el bottom-nav
+function openMobileMore() {
+  const esAdmin = ROL === 'admin';
+  const items = [
+    { id:'historial', ic:'🕐', l:'Movimientos', sub:'Historial de cambios', show:esAdmin },
+    { id:'reportes',  ic:'📈', l:'Reportes',    sub:'Consumo por ingrediente', show:esAdmin },
+    { id:'costos',    ic:'💰', l:'Costos',      sub:'Materias, preparaciones, costeo', show:esAdmin },
+  ].filter(i => i.show);
+  const html = items.map(it => `
+    <button onclick="closeModal('modal-mobile-more');goTab('${it.id}')" style="display:flex;align-items:center;gap:.85rem;padding:1rem;background:var(--bg3);border:.5px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;width:100%;font-family:inherit;color:var(--text)">
+      <div style="font-size:24px;width:36px;height:36px;border-radius:9px;background:var(--accent-bg);display:flex;align-items:center;justify-content:center">${it.ic}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700">${it.l}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:1px">${it.sub}</div>
+      </div>
+      <div style="color:var(--text3);font-size:18px">→</div>
+    </button>
+  `).join('') + `
+    <div style="height:.5px;background:var(--border);margin:.5rem 0"></div>
+    <button onclick="closeModal('modal-mobile-more');window.cerrarSesion()" style="display:flex;align-items:center;gap:.85rem;padding:.75rem 1rem;background:transparent;border:.5px solid var(--red);border-radius:10px;cursor:pointer;color:var(--red);font-weight:600;font-family:inherit;width:100%">
+      🚪 Cerrar sesión
+    </button>`;
+  document.getElementById('mobile-more-list').innerHTML = html;
+  document.getElementById('modal-mobile-more').classList.add('open');
+}
+window.openMobileMore = openMobileMore;
+
+// Helpers para abrir modales nuevos
+function abrirInfoValorizado() { document.getElementById('modal-info-valorizado').classList.add('open'); }
+window.abrirInfoValorizado = abrirInfoValorizado;
+function abrirTutorialConteo() { document.getElementById('modal-tutorial-conteo').classList.add('open'); }
+window.abrirTutorialConteo = abrirTutorialConteo;
 
 // DASHBOARD (mejorado con insights automáticos)
 function renderDash() {
@@ -1434,12 +1609,15 @@ function renderDash() {
       </div>
     </div>
 
-    <!-- INVENTARIO VALORIZADO -->
-    ${valorizado.total > 0 ? `
+    <!-- INVENTARIO VALORIZADO (solo admin) -->
+    ${ROL === 'admin' && valorizado.total > 0 ? `
     <div class="card" style="margin-bottom:.85rem;background:linear-gradient(135deg,#2a1808 0%,#1a1004 100%);border:1px solid var(--accent)">
       <div class="sb" style="margin-bottom:.65rem;flex-wrap:wrap;gap:.5rem">
-        <div>
-          <div class="sl" style="color:var(--accent);margin-bottom:2px">💎 Valor del inventario</div>
+        <div style="flex:1;min-width:0">
+          <div class="sl" style="color:var(--accent);margin-bottom:2px;display:flex;align-items:center;gap:6px">
+            💎 Valor del inventario
+            <span onclick="abrirInfoValorizado()" style="cursor:pointer;background:rgba(249,115,22,.2);color:var(--accent);width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;letter-spacing:0" title="¿De dónde sale este número?">?</span>
+          </div>
           <div style="font-size:32px;font-weight:800;color:var(--accent);line-height:1;letter-spacing:-.015em;font-variant-numeric:tabular-nums">$ ${Math.round(valorizado.total).toLocaleString('es-CL')}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:4px">
             ${valorizado.conPrecio} ${valorizado.conPrecio===1?'ingrediente':'ingredientes'} con precio · stock × precio
@@ -1530,23 +1708,60 @@ function renderDash() {
 }
 
 // ─── INSIGHTS AUTOMÁTICOS ─────────────────────────────
-// Helper: estima precio unitario de un ingrediente cruzando con rawMaterials por nombre
+// Helper: estima precio unitario de un ingrediente cruzando con Materias Primas Y Preparaciones
 function _estimarPrecioIng(ing) {
   if (!ing) return 0;
   // 1) Si tiene precio explícito
   if (ing.precio && Number(ing.precio) > 0) return Number(ing.precio);
-  // 2) Buscar en rawMaterials por coincidencia de nombre (case insensitive)
+
+  const n = String(ing.nombre||'').toLowerCase().trim();
+  if (!n) return 0;
+
+  // 2) Buscar en rawMaterials por nombre (exacto, después fuzzy)
   try {
     if (typeof rawMaterials !== 'undefined' && rawMaterials.length) {
-      const n = String(ing.nombre||'').toLowerCase().trim();
       let mat = rawMaterials.find(m => String(m.name||'').toLowerCase().trim() === n);
       if (!mat) mat = rawMaterials.find(m => {
         const mn = String(m.name||'').toLowerCase().trim();
         return mn && (mn.includes(n) || n.includes(mn));
       });
-      if (mat && typeof getLatestPrice === 'function') return getLatestPrice(mat.id) || 0;
+      if (mat && typeof getLatestPrice === 'function') {
+        const p = getLatestPrice(mat.id) || 0;
+        if (p > 0) return p;
+      }
     }
   } catch(e) {}
+
+  // 3) Buscar en preparations por nombre (exacto, después fuzzy)
+  // Precio = costo total de la tanda / peso total en kg = $/kg
+  try {
+    if (typeof preparations !== 'undefined' && preparations.length) {
+      let prep = preparations.find(p => String(p.name||'').toLowerCase().trim() === n);
+      if (!prep) prep = preparations.find(p => {
+        const pn = String(p.name||'').toLowerCase().trim();
+        return pn && (pn.includes(n) || n.includes(pn));
+      });
+      if (prep && typeof getPreparationCost === 'function' && typeof getPreparationWeightGrams === 'function') {
+        const cost = getPreparationCost(prep.id) || 0;
+        const pesoGr = getPreparationWeightGrams(prep.id) || 0;
+        if (pesoGr > 0 && cost > 0) {
+          // Si el ingrediente del inventario usa "kg", devolver $/kg
+          // Si usa otra unidad, hacer best effort con $/kg de todas formas
+          const unidad = String(ing.unidad||'').toLowerCase();
+          if (unidad === 'kg' || unidad === '' || !unidad) {
+            return cost / (pesoGr / 1000); // $/kg
+          } else if (unidad === 'g' || unidad === 'gr' || unidad === 'gramo') {
+            return cost / pesoGr; // $/gramo
+          } else if (unidad === 'unidad' || unidad === 'porción' || unidad === 'porcion') {
+            return cost; // $/tanda como aproximación
+          } else {
+            return cost / (pesoGr / 1000); // fallback $/kg
+          }
+        }
+      }
+    }
+  } catch(e) {}
+
   return 0;
 }
 
