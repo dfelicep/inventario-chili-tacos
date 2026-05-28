@@ -2326,11 +2326,37 @@ function _expressOpenCurrent() {
   abrirConteoIng(id);
 }
 
-function conteoExpressNext() {
-  // Guarda el actual
+async function conteoExpressNext() {
+  // Guarda el ingrediente actual a Firebase de inmediato
   const v = parseFloat(document.getElementById('conteo-ing-input').value);
+  const idActual = conteoIngActual;
   if (!isNaN(v) && v >= 0) {
-    conteoData[conteoIngActual] = v;
+    const ing = DB.ingredientes.find(i => i.id === idActual);
+    if (ing) {
+      const anterior = ing.stock;
+      const nuevoStock = parseFloat(v.toFixed(4));
+      // Solo registra movimiento si hay cambio real
+      if (Math.abs(nuevoStock - anterior) > 0.0001) {
+        ing.stock = nuevoStock;
+        const tipo = window._conteoTipoActual || 'sabado';
+        const label = tipo === 'miercoles' ? 'Conteo Miércoles' : 'Conteo Sábado';
+        DB.historial.unshift({
+          id: uid(),
+          tipo: 'conteo',
+          fecha: todayStr(),
+          hora: nowTime(),
+          nombre: ing.nombre,
+          ingId: ing.id,
+          cantidad: nuevoStock,
+          stockAnterior: anterior,
+          stockNuevo: nuevoStock,
+          nota: `${label} (express) | ${fmt(anterior)} → ${fmt(nuevoStock)} ${ing.unidad}`
+        });
+        try { await saveDB(); } catch(e) { console.error('Error guardando', e); }
+      }
+      // Marca como editado en la UI (color azul + check)
+      conteoData[idActual] = nuevoStock;
+    }
   }
   actualizarProgreso();
   renderConteoCards();
@@ -2339,7 +2365,8 @@ function conteoExpressNext() {
   if (conteoExpressIdx >= conteoExpressLista.length) {
     conteoExpressFinish();
     closeModal('modal-conteo-ing');
-    toast('✓ Conteo express completo · revisa y guarda');
+    toast('✓ Conteo express completo · cambios guardados');
+    renderDash();
     return;
   }
   _expressOpenCurrent();
