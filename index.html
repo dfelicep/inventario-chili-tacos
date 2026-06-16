@@ -625,6 +625,24 @@ tr:hover td{background:rgba(255,255,255,.025)}
 </div>
 </div>
 
+<!-- MODAL: PRODUCTOS SIN PRECIO -->
+<div class="modal-backdrop" id="modal-sin-precio">
+<div class="modal" style="max-width:540px">
+  <div class="modal-header">
+    <div>
+      <h2 style="display:flex;align-items:center;gap:8px">💲 Productos sin precio</h2>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Asigna un precio para que sumen al valor del inventario</div>
+    </div>
+    <button class="close-btn" onclick="closeModal('modal-sin-precio')">✕</button>
+  </div>
+  <div style="position:relative;margin-bottom:.75rem">
+    <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--text3)">🔍</span>
+    <input id="sinprecio-search" type="text" placeholder="Buscar producto..." oninput="renderSinPrecio(this.value)" style="padding-left:32px">
+  </div>
+  <div id="sinprecio-list" style="display:flex;flex-direction:column;gap:.5rem;max-height:52vh;overflow-y:auto"></div>
+</div>
+</div>
+
 <!-- MODAL: TUTORIAL CONTEO EXPRESS -->
 <div class="modal-backdrop" id="modal-tutorial-conteo">
 <div class="modal" style="max-width:500px">
@@ -1466,6 +1484,81 @@ window.openMobileMore = openMobileMore;
 // Helpers para abrir modales nuevos
 function abrirInfoValorizado() { document.getElementById('modal-info-valorizado').classList.add('open'); }
 window.abrirInfoValorizado = abrirInfoValorizado;
+
+// ─── PRODUCTOS SIN PRECIO ─────────────────────────────
+function abrirSinPrecio() {
+  const s = document.getElementById('sinprecio-search');
+  if (s) s.value = '';
+  renderSinPrecio('');
+  document.getElementById('modal-sin-precio').classList.add('open');
+}
+window.abrirSinPrecio = abrirSinPrecio;
+
+function renderSinPrecio(q) {
+  q = (q||'').toLowerCase().trim();
+  const cont = document.getElementById('sinprecio-list');
+  if (!cont) return;
+  let lista = _inventarioValorizado().sinPrecioList;
+  if (q) lista = lista.filter(i =>
+    String(i.nombre||'').toLowerCase().includes(q) || String(i.categoria||'').toLowerCase().includes(q)
+  );
+  if (!lista.length) {
+    cont.innerHTML = `<div class="empty" style="padding:1.5rem">${q ? 'Sin resultados' : '🎉 Todos los productos tienen precio'}</div>`;
+    return;
+  }
+  cont.innerHTML = lista.map(ing => `
+    <div style="background:var(--bg3);border:.5px solid var(--border);border-radius:10px;padding:.7rem .85rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:700">${escapeHtmlCompra(ing.nombre)}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:1px">${escapeHtmlCompra(ing.categoria||'Sin categoría')} · stock ${fmt(ing.stock)} ${ing.unidad||''}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <div style="position:relative;flex:1">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text3);pointer-events:none">$</span>
+          <input id="sp-precio-${ing.id}" type="number" min="0" step="1" placeholder="Precio por ${ing.unidad||'unidad'}" style="padding-left:22px;font-weight:700">
+        </div>
+        <button class="btn btn-success btn-sm" onclick="guardarPrecioSinPrecio('${ing.id}')" style="white-space:nowrap">✓ Guardar</button>
+      </div>
+    </div>
+  `).join('');
+}
+window.renderSinPrecio = renderSinPrecio;
+
+async function guardarPrecioSinPrecio(ingId) {
+  const ing = DB.ingredientes.find(i => i.id === ingId);
+  if (!ing) return;
+  const inp = document.getElementById('sp-precio-' + ingId);
+  const precio = parseFloat(inp && inp.value);
+  if (isNaN(precio) || precio <= 0) { toast('Ingresa un precio válido', '#450a0a', '#fca5a5'); return; }
+
+  // Buscar si ya existe una materia prima con ese nombre; si no, crearla
+  const n = String(ing.nombre||'').toLowerCase().trim();
+  let mat = rawMaterials.find(m => String(m.name||'').toLowerCase().trim() === n);
+  if (mat) {
+    mat.priceHistory.push({ date: nowStr(), price: precio });
+  } else {
+    // Crear materia prima con la misma unidad del ingrediente
+    const unit = ing.unidad || 'unidad';
+    let custom = [];
+    if (unit === 'kg') custom = [{name:'gramo',factorToBase:0.001},{name:'libra',factorToBase:0.453592}];
+    if (unit === 'litro' || unit === 'litros') custom = [{name:'cc',factorToBase:0.001},{name:'ml',factorToBase:0.001}];
+    rawMaterials.push({
+      id: genId('m'),
+      name: ing.nombre,
+      unit,
+      priceHistory: [{ date: nowStr(), price: precio }],
+      density: (unit==='litro'||unit==='litros') ? 1000 : null,
+      customUnits: custom
+    });
+  }
+  await saveCostosToDB();
+  toast(`✓ Precio asignado a ${ing.nombre}`);
+  renderSinPrecio(document.getElementById('sinprecio-search')?.value || '');
+  renderDash();
+}
+window.guardarPrecioSinPrecio = guardarPrecioSinPrecio;
 function abrirTutorialConteo() { document.getElementById('modal-tutorial-conteo').classList.add('open'); }
 window.abrirTutorialConteo = abrirTutorialConteo;
 
@@ -1633,7 +1726,7 @@ function renderDash() {
           <div style="font-size:32px;font-weight:800;color:var(--accent);line-height:1;letter-spacing:-.015em;font-variant-numeric:tabular-nums">$ ${Math.round(valorizado.total).toLocaleString('es-CL')}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:4px">
             ${valorizado.conPrecio} ${valorizado.conPrecio===1?'ingrediente':'ingredientes'} con precio · stock × precio
-            ${valorizado.sinPrecio > 0 ? `<span style="color:var(--yellow)"> · ${valorizado.sinPrecio} sin precio</span>` : ''}
+            ${valorizado.sinPrecio > 0 ? `<span onclick="event.stopPropagation();abrirSinPrecio()" style="color:var(--yellow);cursor:pointer;text-decoration:underline;text-underline-offset:2px"> · ${valorizado.sinPrecio} sin precio →</span>` : ''}
           </div>
         </div>
       </div>
@@ -1782,17 +1875,18 @@ function _inventarioValorizado() {
   const porCat = {};
   let total = 0;
   let conPrecio = 0, sinPrecio = 0;
+  const sinPrecioList = [];
   DB.ingredientes.forEach(ing => {
     const precio = _estimarPrecioIng(ing);
     const stock = Number(ing.stock) || 0;
     const valor = precio * stock;
-    if (precio > 0) conPrecio++; else sinPrecio++;
+    if (precio > 0) { conPrecio++; } else { sinPrecio++; sinPrecioList.push(ing); }
     if (valor <= 0) return;
     total += valor;
     const cat = ing.categoria || 'Otros';
     porCat[cat] = (porCat[cat] || 0) + valor;
   });
-  return { total, porCat, conPrecio, sinPrecio };
+  return { total, porCat, conPrecio, sinPrecio, sinPrecioList };
 }
 
 function computeInsights() {
@@ -1955,8 +2049,22 @@ function renderIngredientes() {
         </div>
         <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;${c.badge};margin-left:4px;flex-shrink:0;white-space:nowrap">${i.stock<=i.minimo?'COMPRAR':'OK'}</span>
       </div>
-      <div style="font-size:22px;font-weight:700;color:${c.stock};line-height:1;margin-top:.4rem">${fmt(i.stock)}</div>
-      <div style="font-size:11px;color:${c.sub};opacity:.9">${i.unidad} · mín ${fmt(i.minimo)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:.4rem">
+        <div>
+          <div style="font-size:22px;font-weight:700;color:${c.stock};line-height:1">${fmt(i.stock)}</div>
+          <div style="font-size:11px;color:${c.sub};opacity:.9;margin-top:2px">${i.unidad} · mín ${fmt(i.minimo)}</div>
+        </div>
+        ${(() => {
+          if (!esAdmin) return '';
+          const pu = _estimarPrecioIng(i);
+          if (!pu || pu <= 0) return `<div style="text-align:right"><div style="font-size:10px;color:var(--yellow);font-weight:600">sin precio</div></div>`;
+          const totalVal = pu * (Number(i.stock)||0);
+          return `<div style="text-align:right;line-height:1.2">
+            <div style="font-size:14px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums">$${Math.round(totalVal).toLocaleString('es-CL')}</div>
+            <div style="font-size:9px;color:${c.sub};opacity:.85">$${Math.round(pu).toLocaleString('es-CL')}/${i.unidad}</div>
+          </div>`;
+        })()}
+      </div>
       <div style="font-size:10px;color:${c.label};margin-top:3px">${c.txt}</div>
       ${acciones}
     </div>`;
