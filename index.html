@@ -569,6 +569,13 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="filter-btn" data-prio="ok" onclick="setCompraPrio('ok')">Reposición</button>
   </div>
 
+  <!-- Buscador -->
+  <div style="position:relative;margin-bottom:.85rem">
+    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--text3)">🔍</span>
+    <input id="compra-search" type="text" placeholder="Buscar producto..." oninput="setCompraSearch(this.value)" style="padding-left:34px;padding-right:34px">
+    <span id="compra-search-clear" onclick="limpiarCompraSearch()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;cursor:pointer;color:var(--text2);width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%">✕</span>
+  </div>
+
   <div id="compra-contenido"></div>
 </div>
 
@@ -1589,8 +1596,8 @@ function renderDash() {
       </div>
     </div>
 
-    <!-- 4 KPI cards -->
-    <div class="grid4" style="margin-bottom:.85rem">
+    <!-- 4 KPI cards (cocina ve 3, admin ve 4) -->
+    <div class="${ROL === 'admin' ? 'grid4' : 'grid2'}" style="margin-bottom:.85rem">
       <div class="card" onclick="goTab('compra')" style="cursor:pointer;padding:.95rem 1rem">
         <div class="metric" style="color:${critico.length?'var(--red)':'var(--text2)'}">${critico.length}</div>
         <div class="metric-label">Crítico</div>
@@ -1603,10 +1610,11 @@ function renderDash() {
         <div class="metric" style="color:var(--green)">${ok.length}</div>
         <div class="metric-label">En stock OK</div>
       </div>
+      ${ROL === 'admin' ? `
       <div class="card" onclick="goTab('compra')" style="cursor:pointer;padding:.95rem 1rem">
         <div class="metric" style="color:var(--accent);font-size:22px;letter-spacing:-.01em">${compraValor>0 ? '$ '+compraValor.toLocaleString('es-CL') : '—'}</div>
         <div class="metric-label">Estimado a comprar</div>
-      </div>
+      </div>` : ''}
     </div>
 
     <!-- INVENTARIO VALORIZADO (solo admin) -->
@@ -1643,8 +1651,8 @@ function renderDash() {
       </div>` : ''}
     </div>` : ''}
 
-    <!-- INSIGHTS AUTOMÁTICOS -->
-    ${insights.length ? `
+    <!-- INSIGHTS AUTOMÁTICOS (solo admin) -->
+    ${ROL === 'admin' && insights.length ? `
     <div class="card" style="margin-bottom:.85rem">
       <div class="sb" style="margin-bottom:.85rem">
         <div style="font-size:13px;font-weight:700">💡 Detectamos esto en tu inventario</div>
@@ -2431,6 +2439,7 @@ window._setConteoCat = (c) => { conteoCatFilter = c; renderConteo(); };
 // ═══════════════════════════════════════════════
 let compraPrioFiltro = 'todos';
 let compraChecked = new Set(); // ids marcados como "ya compré"
+let compraSearch = ''; // texto de búsqueda
 
 function setCompraPrio(p) {
   compraPrioFiltro = p;
@@ -2440,6 +2449,24 @@ function setCompraPrio(p) {
   renderCompra();
 }
 window.setCompraPrio = setCompraPrio;
+
+function setCompraSearch(q) {
+  compraSearch = (q || '').toLowerCase().trim();
+  const clear = document.getElementById('compra-search-clear');
+  if (clear) clear.style.display = compraSearch ? 'flex' : 'none';
+  renderCompra();
+}
+window.setCompraSearch = setCompraSearch;
+
+function limpiarCompraSearch() {
+  compraSearch = '';
+  const inp = document.getElementById('compra-search');
+  if (inp) inp.value = '';
+  const clear = document.getElementById('compra-search-clear');
+  if (clear) clear.style.display = 'none';
+  renderCompra();
+}
+window.limpiarCompraSearch = limpiarCompraSearch;
 
 // Calcula los items que requieren compra, con prioridad y cantidad sugerida
 function calcularListaCompra() {
@@ -2470,12 +2497,20 @@ function renderCompra() {
   const items = calcularListaCompra();
 
   // Filtrar por prioridad
-  const visibles = compraPrioFiltro === 'todos'
+  let visibles = compraPrioFiltro === 'todos'
     ? items
     : items.filter(i => {
         if (compraPrioFiltro === 'ok') return i.prioridad === 'reposicion';
         return i.prioridad === compraPrioFiltro;
       });
+
+  // Filtrar por búsqueda (nombre o categoría)
+  if (compraSearch) {
+    visibles = visibles.filter(i =>
+      String(i.nombre||'').toLowerCase().includes(compraSearch) ||
+      String(i.categoria||'').toLowerCase().includes(compraSearch)
+    );
+  }
 
   // KPIs
   const kpis = document.getElementById('compra-kpis');
@@ -2505,12 +2540,12 @@ function renderCompra() {
   if (!visibles.length) {
     cont.innerHTML = `
       <div class="card" style="text-align:center;padding:2.5rem">
-        <div style="font-size:48px;margin-bottom:.5rem">${items.length ? '✓' : '🎉'}</div>
+        <div style="font-size:48px;margin-bottom:.5rem">${compraSearch ? '🔍' : (items.length ? '✓' : '🎉')}</div>
         <div style="font-size:15px;font-weight:600;margin-bottom:.25rem">
-          ${items.length ? 'No hay ítems en esta categoría' : 'Todo está sobre el mínimo'}
+          ${compraSearch ? 'Sin resultados' : (items.length ? 'No hay ítems en esta categoría' : 'Todo está sobre el mínimo')}
         </div>
         <div style="font-size:12px;color:var(--text2)">
-          ${items.length ? 'Cambia el filtro arriba' : 'No necesitas comprar nada por ahora'}
+          ${compraSearch ? `No se encontró "${escapeHtmlCompra(compraSearch)}" en la lista` : (items.length ? 'Cambia el filtro arriba' : 'No necesitas comprar nada por ahora')}
         </div>
       </div>`;
     return;
