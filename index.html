@@ -933,7 +933,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">El stock se sumará automáticamente al inventario</div>
 
   <label>Ingrediente</label>
-  <select id="compra-ing" onchange="updCompraHint()"></select>
+  <div style="position:relative;margin-bottom:.4rem">
+    <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--text3)">🔍</span>
+    <input id="compra-ing-search" type="text" placeholder="Buscar ingrediente..." oninput="filtrarCompraIng(this.value)" style="padding-left:32px">
+  </div>
+  <select id="compra-ing" onchange="updCompraHint()" size="1"></select>
   <div id="compra-stock-actual" style="font-size:11px;color:var(--text2);margin-top:4px"></div>
 
   <label>Cantidad comprada <span id="compra-hint" style="color:var(--accent)"></span></label>
@@ -1958,6 +1962,7 @@ function renderIngredientes() {
     </div>`;
   }).join('') || '<div class="empty">Sin resultados</div>';
 }
+window.renderIngredientes = renderIngredientes;
 window._setCatFilter = (c) => { catFilter = c; renderIngredientes(); };
 
 // ─── DETALLE DE INGREDIENTE ───────────────────────────
@@ -2913,8 +2918,29 @@ async function elimIng(id) { if (ROL !== 'admin') return; if (!confirm('¿Elimin
 window.elimIng = elimIng;
 
 // REGISTRO DE COMPRAS
-function openCompraModal() { document.getElementById('compra-ing').innerHTML = DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${fmt(i.stock)} ${i.unidad})</option>`).join(''); document.getElementById('compra-qty').value = ''; document.getElementById('compra-nota').value = ''; document.getElementById('compra-nuevo-stock').style.display = 'none'; updCompraHint(); document.getElementById('modal-compra').classList.add('open'); setTimeout(() => document.getElementById('compra-qty').focus(), 200); }
+function openCompraModal() { const s=document.getElementById('compra-ing-search'); if(s) s.value=''; renderCompraIngOptions(''); document.getElementById('compra-qty').value = ''; document.getElementById('compra-nota').value = ''; document.getElementById('compra-nuevo-stock').style.display = 'none'; updCompraHint(); document.getElementById('modal-compra').classList.add('open'); setTimeout(() => { const ss=document.getElementById('compra-ing-search'); if(ss) ss.focus(); }, 200); }
 window.openCompraModal = openCompraModal;
+function renderCompraIngOptions(q) {
+  q = (q||'').toLowerCase().trim();
+  const sel = document.getElementById('compra-ing');
+  if (!sel) return;
+  const prev = sel.value;
+  const lista = DB.ingredientes.filter(i =>
+    !q || String(i.nombre||'').toLowerCase().includes(q) || String(i.categoria||'').toLowerCase().includes(q)
+  );
+  sel.innerHTML = lista.map(i => `<option value="${i.id}">${i.nombre} (${fmt(i.stock)} ${i.unidad})</option>`).join('')
+    || '<option value="" disabled selected>Sin resultados</option>';
+  // Mantener selección previa si sigue visible; si no, tomar el primero
+  if (lista.some(i => i.id === prev)) sel.value = prev;
+  // Tamaño tipo lista cuando hay búsqueda activa (para ver varios sin desplegar)
+  sel.size = q ? Math.min(6, Math.max(2, lista.length)) : 1;
+}
+function filtrarCompraIng(q) {
+  renderCompraIngOptions(q);
+  updCompraHint();
+}
+window.filtrarCompraIng = filtrarCompraIng;
+window.renderCompraIngOptions = renderCompraIngOptions;
 function updCompraHint() { const id = document.getElementById('compra-ing').value; const ing = DB.ingredientes.find(i => i.id === id); if (!ing) return; document.getElementById('compra-hint').textContent = `(en ${ing.unidad})`; document.getElementById('compra-stock-actual').textContent = `Stock actual: ${fmt(ing.stock)} ${ing.unidad}`; actualizarCompraPreview(); }
 window.updCompraHint = updCompraHint;
 function actualizarCompraPreview() { const id = document.getElementById('compra-ing').value; const qty = parseFloat(document.getElementById('compra-qty').value); const ing = DB.ingredientes.find(i => i.id === id); const previewEl = document.getElementById('compra-nuevo-stock'); if (!ing || isNaN(qty) || qty <= 0) { previewEl.style.display = 'none'; return; } const nuevo = parseFloat((ing.stock + qty).toFixed(4)); document.getElementById('compra-stock-antes').textContent = `${fmt(ing.stock)} ${ing.unidad}`; document.getElementById('compra-qty-preview').textContent = `+${fmt(qty)} ${ing.unidad}`; document.getElementById('compra-stock-nuevo').textContent = `${fmt(nuevo)} ${ing.unidad}`; previewEl.style.display = ''; }
