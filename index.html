@@ -453,6 +453,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <button class="btn btn-primary btn-sm" onclick="nuevaMateriaPrima()" style="white-space:nowrap">+ Nueva MP</button>
       <button class="btn btn-ghost btn-sm" onclick="restaurarPreciosDic2025()" style="white-space:nowrap">🔄 Restaurar precios dic 2025</button>
     </div>
+    <div style="position:relative;margin-bottom:.75rem">
+      <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--text3)">🔍</span>
+      <input id="mp-search" type="text" placeholder="Buscar materia prima..." oninput="renderRawMaterials()" style="padding-left:32px">
+    </div>
     <div id="listaMateriasPrimas"></div>
     <div class="card" style="margin-top:.75rem">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);padding:.5rem 1rem;border-bottom:.5px solid var(--border)">⚙️ Costos Operacionales</div>
@@ -479,6 +483,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div id="costos-preparaciones" style="display:none">
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
       <button class="btn btn-primary btn-sm" onclick="abrirEditorPreparacion(null)">+ Nueva preparación</button>
+    </div>
+    <div style="position:relative;margin-bottom:.75rem">
+      <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--text3)">🔍</span>
+      <input id="prep-search" type="text" placeholder="Buscar preparación..." oninput="renderPreparaciones()" style="padding-left:32px">
     </div>
     <div id="listaPreparaciones"></div>
   </div>
@@ -3466,8 +3474,11 @@ window.restaurarPreciosDic2025 = restaurarPreciosDic2025;
 
 function renderRawMaterials() {
   const cont = document.getElementById('listaMateriasPrimas'); if(!cont) return;
-  const items = rawMaterials;
-  if (!items.length) { cont.innerHTML=`<div class="empty">Sin materias primas</div>`; return; }
+  const q = (document.getElementById('mp-search')||{}).value?.toLowerCase().trim()||'';
+  let items = rawMaterials;
+  if (q) items = items.filter(m => String(m.name||'').toLowerCase().includes(q));
+  if (!rawMaterials.length) { cont.innerHTML=`<div class="empty">Sin materias primas</div>`; return; }
+  if (!items.length) { cont.innerHTML=`<div class="empty">Sin resultados para "${escapeHtml(q)}"</div>`; return; }
   cont.innerHTML = items.map(mat => {
     const price = getLatestPrice(mat.id);
     const lastEntry = mat.priceHistory[mat.priceHistory.length-1];
@@ -3533,12 +3544,15 @@ function eliminarMP(id) { if(!confirm('¿Eliminar?')) return; rawMaterials = raw
 window.eliminarMP = eliminarMP;
 function nuevaMateriaPrima() { const name=prompt('Nombre materia prima:'); if(!name) return; const unit=prompt('Unidad base (kg, litro, unidad):','kg'); if(!unit) return; const price=parseFloat(prompt('Precio inicial:','0')); if(isNaN(price)) return; let custom=[]; if(unit==='kg') custom=[{name:"gramo",factorToBase:0.001},{name:"libra",factorToBase:0.453592}]; if(unit==='litro') custom=[{name:"cc",factorToBase:0.001},{name:"ml",factorToBase:0.001},{name:"cucharada",factorToBase:0.015},{name:"taza",factorToBase:0.24}]; rawMaterials.push({id:genId('m'),name:name.trim(),unit,priceHistory:[{date:nowStr(),price}],density:(unit==='litro'?1000:null),customUnits:custom}); saveCostosToDB(); fullRefresh(); toast(`✓ ${name} agregada`); }
 window.nuevaMateriaPrima = nuevaMateriaPrima;
+window.renderRawMaterials = renderRawMaterials;
 
 // ── RENDER PREPARACIONES ────────────────────
 function renderPreparaciones() {
   const cont = document.getElementById('listaPreparaciones'); if(!cont) return;
   if (!rawMaterials.length) loadCostosFromDB();
-  const items = preparations;
+  const q = (document.getElementById('prep-search')||{}).value?.toLowerCase().trim()||'';
+  let items = preparations;
+  if (q) items = items.filter(p => String(p.name||'').toLowerCase().includes(q));
   if(!items.length){cont.innerHTML=`<div class="empty">${preparations.length?'Sin resultados':'Crea la primera preparación'}</div>`;return;}
   const gasHr = Math.round(getCostoHoraGas());
   const moHr = parseFloat(document.getElementById('op-mo-hora')?.value)||4500;
@@ -3648,6 +3662,7 @@ function eliminarPreparacion(id) {
   saveCostosToDB(); fullRefresh(); toast('Eliminada','#450a0a','#fca5a5');
 }
 window.eliminarPreparacion = eliminarPreparacion;
+window.renderPreparaciones = renderPreparaciones;
 
 // ── EDITOR DE PREPARACIONES (CORREGIDO) ─────
 function abrirEditorPreparacion(prepId = null) {
