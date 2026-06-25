@@ -1075,7 +1075,6 @@ window.onunhandledrejection = function(e) {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC_Pngp45ZwwrvIsF_d-eVYwyb89HQLl5A",
@@ -1089,26 +1088,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const auth = getAuth(app);
-
-// AUTENTICACIÓN ANÓNIMA — bloquea la base a quien no use esta app
-let authListo = false;
-let authPromise = new Promise((resolve) => {
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      authListo = true;
-      resolve(user);
-    }
-  });
-});
-// Inicia sesión anónima al cargar (silencioso, el usuario no ve nada)
-signInAnonymously(auth).catch((e) => {
-  console.error('Error de autenticación:', e);
-  // Si falla auth (ej: no está habilitada en Firebase), avisa pero deja seguir
-  setTimeout(() => {
-    toast('⚠ Habilita "Acceso anónimo" en Firebase Authentication', '#450a0a', '#fca5a5');
-  }, 1500);
-});
 
 // PINES DE ACCESO
 const PINS = {
@@ -1156,7 +1135,6 @@ function setSyncStatus(status) {
 
 async function saveDB() {
   setSyncStatus('syncing');
-  await authPromise; // asegura sesión antes de escribir
   if (!Array.isArray(DB.categorias) || DB.categorias.length === 0) {
     DB.categorias = ['Proteínas','Fajitas','Secos','Verduras','Lácteos','Salsas','Empaques','Otros'];
   }
@@ -1181,7 +1159,6 @@ async function saveDB() {
 async function loadDB() {
   setSyncStatus('syncing');
   try {
-    await authPromise; // espera a que la sesión anónima esté lista
     const snap = await get(ref(db, 'inventario'));
     if (snap.exists()) {
       const data = snap.val();
@@ -1223,8 +1200,7 @@ async function loadDB() {
 }
 
 function escucharCambios() {
-  authPromise.then(() => {
-    onValue(ref(db, 'inventario'), (snap) => {
+  onValue(ref(db, 'inventario'), (snap) => {
     if (snap.exists()) {
       const data = snap.val();
       DB.ingredientes = data.ingredientes || [];
@@ -1242,7 +1218,6 @@ function escucharCambios() {
         if (tabs[idx]) renderTab(tabs[idx]);
       }
     }
-  });
   });
 }
 
