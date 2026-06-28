@@ -2978,19 +2978,71 @@ function renderReportes() {
   const semanas = [];
   let cur = inicioSemana(hoy);
   for (let s = 0; s < nSemanas; s++) { const ini = new Date(cur); const fin = new Date(cur); fin.setDate(fin.getDate()+6); fin.setHours(23,59,59); semanas.unshift({ini, fin, label:`${fmtFecha(ini)} — ${fmtFecha(fin)}`, esActual: s===0}); cur.setDate(cur.getDate()-7); }
-  const todosConteos = DB.historial.filter(h => h.tipo==='conteo' && !h.nombre.startsWith('📝')).sort((a,b) => new Date(a.fecha+' '+a.hora) - new Date(b.fecha+' '+b.hora));
+  const todosConteos = DB.historial.filter(h => h.tipo==='conteo' && h.nombre && !h.nombre.startsWith('📝')).sort((a,b) => {
+    const da = new Date((a.fecha||'1970-01-01')+'T'+(a.hora||'00:00')+':00');
+    const db2 = new Date((b.fecha||'1970-01-01')+'T'+(b.hora||'00:00')+':00');
+    return da - db2;
+  });
+  // Indexar por nombre (trim + lowercase para tolerancia) Y por ingId si existe
   const porIngrediente = {};
-  todosConteos.forEach(h => { if (!porIngrediente[h.nombre]) porIngrediente[h.nombre] = []; porIngrediente[h.nombre].push({ts: new Date(h.fecha+' '+h.hora), cantidad: parseFloat(h.cantidad)||0}); });
-  function consumoEnSemana(registros, ini, fin) { const dentro = registros.filter(r => r.ts >= ini && r.ts <= fin); const antes = registros.filter(r => r.ts < ini).slice(-1)[0]; if (!dentro.length) return 0; const base = antes ? antes.cantidad : dentro[0].cantidad; const ultimo = dentro[dentro.length-1].cantidad; const c = base - ultimo; return c > 0 ? parseFloat(c.toFixed(3)) : 0; }
+  // Parse de fecha como hora LOCAL (no UTC) para evitar desfase por zona horaria
+  function _parseFechaLocal(fecha, hora) {
+    if (!fecha) return new Date(0);
+    const [y,m,d] = fecha.split('-').map(Number);
+    const [hh,mm] = (hora||'12:00').split(':').map(Number);
+    return new Date(y, (m||1)-1, d||1, hh||12, mm||0, 0);
+  }
+  const _key = h => String(h.nombre||'').trim().toLowerCase();
+  todosConteos.forEach(h => {
+    const k = _key(h);
+    if (!k) return;
+    const ts = _parseFechaLocal(h.fecha, h.hora);
+    if (!porIngrediente[k]) porIngrediente[k] = [];
+    porIngrediente[k].push({ts, cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0, ingId: h.ingId, nombre: h.nombre});
+  });
+  function consumoEnSemana(registros, ini, fin) {
+    // Filtra todos los registros ordenados
+    const todos = [...registros].sort((a,b) => a.ts - b.ts);
+    if (todos.length < 2) return 0;
+    // Busca los registros relevantes: el último ANTES de ini (base) + los del período
+    const antes = todos.filter(r => r.ts < ini);
+    const dentro = todos.filter(r => r.ts >= ini && r.ts <= fin);
+    if (!dentro.length) return 0;
+    // Cadena completa para el período: último antes + todos dentro
+    const cadena = antes.length ? [antes[antes.length-1], ...dentro] : dentro;
+    // Suma todas las caídas de stock entre puntos consecutivos (ignora subidas por compras)
+    let consumo = 0;
+    for (let i = 1; i < cadena.length; i++) {
+      const diff = cadena[i-1].cantidad - cadena[i].cantidad;
+      if (diff > 0) consumo += diff; // solo sumar cuando bajó (consumo real)
+    }
+    return parseFloat(consumo.toFixed(3));
+  }
+  // También indexar por ingId para lookup más confiable
+  const porIngId = {};
+  todosConteos.forEach(h => {
+    if (!h.ingId) return;
+    const ts = _parseFechaLocal(h.fecha, h.hora);
+    if (!porIngId[h.ingId]) porIngId[h.ingId] = [];
+    porIngId[h.ingId].push({ts, cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0});
+  });
+  // Lookup tolerante: primero por ingId, luego por nombre, luego parcial
+  function getRegistros(ing) {
+    if (ing.id && porIngId[ing.id] && porIngId[ing.id].length >= 1) return porIngId[ing.id];
+    const k = String(ing.nombre||'').trim().toLowerCase();
+    if (porIngrediente[k] && porIngrediente[k].length >= 1) return porIngrediente[k];
+    const match = Object.keys(porIngrediente).find(k2 => k2.includes(k.slice(0,5)) || k.includes(k2.slice(0,5)));
+    return match ? porIngrediente[match] : [];
+  }
   const cats = DB.categorias || [...new Set(DB.ingredientes.map(i=>i.categoria))];
   const catColores = {'Proteínas':'background:#450a0a;color:#fca5a5','Fajitas':'background:#431407;color:#fdba74','Secos':'background:#431407;color:#fdba74','Verduras':'background:#14532d;color:#86efac','Lácteos':'background:#1e3a5f;color:#93c5fd','Salsas':'background:#3b1d6e;color:#c4b5fd','Empaques':'background:#134e4a;color:#99f6e4','Otros':'background:#22263a;color:#94a3b8'};
   const html = cats.map(cat => {
-    const ings = DB.ingredientes.filter(i => i.categoria===cat && porIngrediente[i.nombre]);
+    const ings = DB.ingredientes.filter(i => i.categoria===cat && getRegistros(i).length >= 2);
     if (!ings.length) return '';
     const abierta = reporteCatsAbiertas.has(cat);
     const color = catColores[cat] || 'background:#22263a;color:#94a3b8';
     const ingHTML = ings.map(ing => {
-      const registros = porIngrediente[ing.nombre] || [];
+      const registros = getRegistros(ing);
       const datos = semanas.map(s => ({...s, consumo: consumoEnSemana(registros, s.ini, s.fin)}));
       const totalPeriodo = datos.reduce((a,b) => a+b.consumo, 0);
       if (totalPeriodo === 0) return '';
