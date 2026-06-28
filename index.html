@@ -1152,7 +1152,7 @@ async function saveDB() {
     await set(ref(db, 'inventario'), {
       ingredientes: DB.ingredientes,
       recetas: DB.recetas,
-      historial: DB.historial.slice(0, 500),
+      historial: DB.historial.slice(0, 5000),
       categorias: DB.categorias,
       costosOp: DB.costosOp,
       rawMaterials: DB.rawMaterials,
@@ -2828,7 +2828,7 @@ function renderCompra() {
             <div style="font-size:15px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums">
               ${formatNumber(it.sugerido)} ${it.unidad||''}
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-top:1px">comprar</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">se sugiere comprar</div>
           </div>
 
           <!-- Pill prioridad -->
@@ -3075,7 +3075,53 @@ function renderReportes() {
     </div>
   ` : '';
 
-  document.getElementById('reporte-content').innerHTML = (html ? summaryHTML : '') + (html || `<div class="card" style="text-align:center;padding:2rem"><div style="font-size:32px;margin-bottom:.5rem">📊</div><div style="font-weight:600;margin-bottom:.25rem">Sin datos suficientes</div><div style="font-size:12px;color:var(--text2)">Realiza conteos semanales para ver el consumo aquí</div></div>`);
+  // Panel de diagnóstico — cuántos datos hay realmente
+  function _diagReportes() {
+    const total = DB.historial.length;
+    const conteos = DB.historial.filter(h => h.tipo==='conteo' && h.nombre && !h.nombre.startsWith('📝'));
+    const fechasConteo = [...new Set(conteos.map(h => h.fecha))].filter(Boolean).sort();
+    const ingsConteo = [...new Set(conteos.map(h => h.nombre))];
+    // ingredientes con ≥2 conteos en fechas distintas (los usables para consumo)
+    const usables = ingsConteo.filter(nom => {
+      const fechas = [...new Set(conteos.filter(h=>h.nombre===nom).map(h=>h.fecha))];
+      return fechas.length >= 2;
+    });
+    const primera = fechasConteo[0];
+    const ultima = fechasConteo[fechasConteo.length-1];
+    const capPct = Math.min(100, Math.round(total/5000*100));
+    const capColor = total >= 4500 ? 'var(--red)' : total >= 3000 ? 'var(--yellow)' : 'var(--green)';
+    return `
+    <div class="card" style="margin-top:.75rem;padding:1rem 1.1rem">
+      <div class="sl" style="margin-bottom:.75rem">🔎 Diagnóstico de tus datos</div>
+      <div class="grid2" style="gap:.6rem;margin-bottom:.6rem">
+        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
+          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${total}</div>
+          <div class="sl" style="margin-top:2px">Movimientos guardados</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
+          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${conteos.length}</div>
+          <div class="sl" style="margin-top:2px">Registros de conteo</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
+          <div style="font-size:22px;font-weight:800;color:${usables.length?'var(--green)':'var(--text2)'};font-variant-numeric:tabular-nums">${usables.length}</div>
+          <div class="sl" style="margin-top:2px">Ingredientes usables*</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
+          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${fechasConteo.length}</div>
+          <div class="sl" style="margin-top:2px">Fechas con conteo</div>
+        </div>
+      </div>
+      ${primera ? `<div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">📅 Datos desde <strong style="color:var(--text)">${primera}</strong> hasta <strong style="color:var(--text)">${ultima}</strong></div>` : ''}
+      <!-- barra de capacidad -->
+      <div class="sl" style="margin-bottom:4px">Capacidad de historial · ${total} / 5.000</div>
+      <div style="height:7px;background:var(--bg3);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${capPct}%;background:${capColor};border-radius:99px"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">*Usables = ingredientes con al menos 2 conteos en fechas distintas (lo mínimo para calcular consumo).</div>
+    </div>`;
+  }
+
+  document.getElementById('reporte-content').innerHTML = (html ? summaryHTML : '') + (html || `<div class="card" style="text-align:center;padding:1.5rem"><div style="font-size:32px;margin-bottom:.5rem">📊</div><div style="font-weight:600;margin-bottom:.25rem">Aún no hay consumo para mostrar</div><div style="font-size:12px;color:var(--text2);line-height:1.5">El consumo se calcula entre dos conteos del mismo ingrediente.<br>Cuando tengas 2 conteos en fechas distintas, aparecerá aquí.</div></div>`) + (ROL === 'admin' ? _diagReportes() : '');
 }
 window.renderReportes = renderReportes;
 window._toggleReporteCat = (cat) => {
