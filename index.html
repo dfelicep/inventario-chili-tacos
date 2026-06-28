@@ -435,16 +435,17 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <!-- REPORTES (solo admin) -->
 <div class="page" id="page-reportes">
-  <div style="margin-bottom:1rem">
-    <div class="sb" style="margin-bottom:.5rem">
-      <h2>Reportes de consumo</h2>
-      <select id="reporte-semanas" onchange="renderReportes()" style="width:auto">
-        <option value="4">Últimas 4 semanas</option>
-        <option value="8">Últimas 8 semanas</option>
-        <option value="12">Últimas 12 semanas</option>
+  <div style="margin-bottom:.75rem">
+    <div class="sb" style="margin-bottom:.25rem">
+      <h2>📊 Comparativa de conteos</h2>
+      <select id="reporte-conteo-sel" onchange="renderReportes()" style="width:auto">
+        <option value="0">Último conteo vs anterior</option>
+        <option value="1">Antepenúltimo vs antes</option>
+        <option value="mes">Mes completo</option>
+        <option value="mes-ant">Mes anterior</option>
       </select>
     </div>
-    <div style="font-size:12px;color:var(--text2)">Toca una categoría para ver el detalle por ingrediente</div>
+    <div style="font-size:12px;color:var(--text2)">Qué bajó (consumiste) y qué subió (recibiste) entre dos conteos</div>
   </div>
   <div id="reporte-content"></div>
 </div>
@@ -2971,209 +2972,323 @@ function _sparkline(data, color, w, h) {
 }
 
 function renderReportes() {
-  const nSemanas = parseInt(document.getElementById('reporte-semanas').value) || 4;
-  const hoy = new Date();
-  function inicioSemana(d) { const f = new Date(d); const dia = f.getDay(); const diff = dia === 0 ? 6 : dia - 1; f.setDate(f.getDate() - diff); f.setHours(0,0,0,0); return f; }
-  function fmtFecha(d) { return d.toLocaleDateString('es-CL',{day:'numeric',month:'short'}); }
-  const semanas = [];
-  let cur = inicioSemana(hoy);
-  for (let s = 0; s < nSemanas; s++) { const ini = new Date(cur); const fin = new Date(cur); fin.setDate(fin.getDate()+6); fin.setHours(23,59,59); semanas.unshift({ini, fin, label:`${fmtFecha(ini)} — ${fmtFecha(fin)}`, esActual: s===0}); cur.setDate(cur.getDate()-7); }
-  const todosConteos = DB.historial.filter(h => h.tipo==='conteo' && h.nombre && !h.nombre.startsWith('📝')).sort((a,b) => {
-    const da = new Date((a.fecha||'1970-01-01')+'T'+(a.hora||'00:00')+':00');
-    const db2 = new Date((b.fecha||'1970-01-01')+'T'+(b.hora||'00:00')+':00');
-    return da - db2;
-  });
-  // Indexar por nombre (trim + lowercase para tolerancia) Y por ingId si existe
-  const porIngrediente = {};
-  // Parse de fecha como hora LOCAL (no UTC) para evitar desfase por zona horaria
-  function _parseFechaLocal(fecha, hora) {
-    if (!fecha) return new Date(0);
-    const [y,m,d] = fecha.split('-').map(Number);
-    const [hh,mm] = (hora||'12:00').split(':').map(Number);
-    return new Date(y, (m||1)-1, d||1, hh||12, mm||0, 0);
-  }
-  const _key = h => String(h.nombre||'').trim().toLowerCase();
-  todosConteos.forEach(h => {
-    const k = _key(h);
-    if (!k) return;
-    const ts = _parseFechaLocal(h.fecha, h.hora);
-    if (!porIngrediente[k]) porIngrediente[k] = [];
-    porIngrediente[k].push({ts, cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0, ingId: h.ingId, nombre: h.nombre});
-  });
-  function consumoEnSemana(registros, ini, fin) {
-    // Filtra todos los registros ordenados
-    const todos = [...registros].sort((a,b) => a.ts - b.ts);
-    if (todos.length < 2) return 0;
-    // Busca los registros relevantes: el último ANTES de ini (base) + los del período
-    const antes = todos.filter(r => r.ts < ini);
-    const dentro = todos.filter(r => r.ts >= ini && r.ts <= fin);
-    if (!dentro.length) return 0;
-    // Cadena completa para el período: último antes + todos dentro
-    const cadena = antes.length ? [antes[antes.length-1], ...dentro] : dentro;
-    // Suma todas las caídas de stock entre puntos consecutivos (ignora subidas por compras)
-    let consumo = 0;
-    for (let i = 1; i < cadena.length; i++) {
-      const diff = cadena[i-1].cantidad - cadena[i].cantidad;
-      if (diff > 0) consumo += diff; // solo sumar cuando bajó (consumo real)
-    }
-    return parseFloat(consumo.toFixed(3));
-  }
-  // También indexar por ingId para lookup más confiable
-  const porIngId = {};
-  todosConteos.forEach(h => {
-    if (!h.ingId) return;
-    const ts = _parseFechaLocal(h.fecha, h.hora);
-    if (!porIngId[h.ingId]) porIngId[h.ingId] = [];
-    porIngId[h.ingId].push({ts, cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0});
-  });
-  // Lookup tolerante: primero por ingId, luego por nombre, luego parcial
-  function getRegistros(ing) {
-    if (ing.id && porIngId[ing.id] && porIngId[ing.id].length >= 1) return porIngId[ing.id];
-    const k = String(ing.nombre||'').trim().toLowerCase();
-    if (porIngrediente[k] && porIngrediente[k].length >= 1) return porIngrediente[k];
-    const match = Object.keys(porIngrediente).find(k2 => k2.includes(k.slice(0,5)) || k.includes(k2.slice(0,5)));
-    return match ? porIngrediente[match] : [];
-  }
-  const cats = DB.categorias || [...new Set(DB.ingredientes.map(i=>i.categoria))];
-  const catColores = {'Proteínas':'background:#450a0a;color:#fca5a5','Fajitas':'background:#431407;color:#fdba74','Secos':'background:#431407;color:#fdba74','Verduras':'background:#14532d;color:#86efac','Lácteos':'background:#1e3a5f;color:#93c5fd','Salsas':'background:#3b1d6e;color:#c4b5fd','Empaques':'background:#134e4a;color:#99f6e4','Otros':'background:#22263a;color:#94a3b8'};
-  const html = cats.map(cat => {
-    const ings = DB.ingredientes.filter(i => i.categoria===cat && getRegistros(i).length >= 2);
-    if (!ings.length) return '';
-    const abierta = reporteCatsAbiertas.has(cat);
-    const color = catColores[cat] || 'background:#22263a;color:#94a3b8';
-    const ingHTML = ings.map(ing => {
-      const registros = getRegistros(ing);
-      const datos = semanas.map(s => ({...s, consumo: consumoEnSemana(registros, s.ini, s.fin)}));
-      const totalPeriodo = datos.reduce((a,b) => a+b.consumo, 0);
-      if (totalPeriodo === 0) return '';
-      const maxConsumo = Math.max(...datos.map(d=>d.consumo), 0.1);
-      // Sparkline + trend
-      const sparkData = datos.map(d => d.consumo);
-      const tendencia = sparkData.length >= 2 && sparkData[0] > 0
-        ? ((sparkData[sparkData.length-1] - sparkData[0]) / sparkData[0]) * 100
-        : 0;
-      const tColor = tendencia > 10 ? 'var(--red)' : tendencia < -10 ? 'var(--green)' : 'var(--text2)';
-      const tIcon = tendencia > 10 ? '↑' : tendencia < -10 ? '↓' : '→';
-      const sparkColor = tendencia > 10 ? '#ef4444' : tendencia < -10 ? '#22c55e' : '#f97316';
-      return `<div style="padding:.5rem 0;border-bottom:.5px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;gap:.5rem">
-          <span style="font-size:12px;font-weight:600;flex:1;min-width:0">${ing.nombre}</span>
-          ${_sparkline(sparkData, sparkColor, 70, 20)}
-          <span style="font-size:10px;font-weight:700;color:${tColor};min-width:42px;text-align:right">${tIcon} ${Math.abs(tendencia).toFixed(0)}%</span>
-          <span style="font-size:11px;color:var(--accent);font-weight:700;min-width:90px;text-align:right">${fmt(totalPeriodo)} ${ing.unidad}</span>
-        </div>
-        ${datos.map(d => { const pct = Math.round((d.consumo/maxConsumo)*100); const colorBarra = d.esActual ? 'var(--accent)' : '#0d9488'; return `<div style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;border-bottom:.5px solid var(--border)">
-          <span style="font-size:10px;color:${colorBarra};font-weight:${d.esActual?'600':'400'};width:110px;flex-shrink:0">${d.label}${d.esActual?' ★':''}</span>
-          <div style="height:7px;border-radius:4px;background:var(--bg3);overflow:hidden;flex:1"><div style="height:100%;width:${d.consumo>0?pct:0}%;background:${colorBarra};border-radius:4px"></div></div>
-          <span style="font-size:11px;font-weight:${d.esActual?'600':'400'};color:${d.consumo>0?(d.esActual?'var(--accent)':'var(--text)'):'var(--text2)'};width:60px;text-align:right;flex-shrink:0">${d.consumo>0?fmt(d.consumo)+' '+ing.unidad:'—'}</span>
-        </div>`; }).join('')}
+  const cont = document.getElementById('reporte-content');
+  if (!cont) return;
+  const offset = document.getElementById('reporte-conteo-sel')?.value || '0';
+  const esMes = offset === 'mes' || offset === 'mes-ant';
+
+  const fmt2 = n => Number.isInteger(n) ? String(n) : (Math.round(n*100)/100).toFixed(n%1===0?0:1).replace(/\.0$/,'');
+
+  // Todos los conteos (compartido entre modos)
+  const todosConteos = DB.historial.filter(h =>
+    h.tipo === 'conteo' && h.nombre && !h.nombre.startsWith('📝')
+  );
+
+
+  if (esMes) {
+    // ─── MODO MES COMPLETO ─────────────────────────────
+    const hoy = new Date();
+    let mesRef = offset === 'mes-ant'
+      ? new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+      : new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const mesIni = new Date(mesRef.getFullYear(), mesRef.getMonth(), 1);
+    const mesFin = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0, 23, 59, 59);
+    const mesLabel = mesRef.toLocaleDateString('es-CL', {month:'long', year:'numeric'});
+
+    // Conteos del mes filtrados
+    const conteosMes = todosConteos.filter(h => {
+      if (!h.fecha) return false;
+      const [y,m,d] = h.fecha.split('-').map(Number);
+      const fd = new Date(y, m-1, d);
+      return fd >= mesIni && fd <= mesFin;
+    });
+
+    if (!conteosMes.length) {
+      cont.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+        <div style="font-size:40px;margin-bottom:.5rem">📅</div>
+        <div style="font-weight:700;font-size:15px">Sin conteos en ${mesLabel}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:.35rem">No hay registros de conteo para este período.</div>
       </div>`;
-    }).filter(Boolean).join('');
-    if (!ingHTML) return '';
-    return `<div class="card" style="margin-bottom:.5rem;overflow:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.875rem 1rem;cursor:pointer;transition:background .15s" onclick="window._toggleReporteCat('${cat}')">
-        <div style="display:flex;align-items:center;gap:.75rem">
-          <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;${color}">${cat}</span>
-          <span style="font-size:12px;color:var(--text2)">${ings.filter(i=>{const r=porIngrediente[i.nombre];if(!r)return false;return semanas.some(s=>consumoEnSemana(r,s.ini,s.fin)>0)}).length} ingredientes</span>
+      return;
+    }
+
+    // Para cada ingrediente: primer y último valor del mes + suma de bajadas y subidas
+    const ingMap = {};
+    conteosMes.forEach(h => {
+      const id = h.ingId || h.nombre;
+      if (!ingMap[id]) {
+        const info = DB.ingredientes.find(i => (i.id === h.ingId) || (i.nombre === h.nombre)) || {};
+        ingMap[id] = {
+          nombre: h.nombre, ingId: h.ingId,
+          unidad: info.unidad || '',
+          categoria: info.categoria || 'Otros',
+          registros: [],
+        };
+      }
+      const [y,m,d] = (h.fecha||'1970-01-01').split('-').map(Number);
+      const [hh,mm] = (h.hora||'12:00').split(':').map(Number);
+      ingMap[id].registros.push({
+        ts: new Date(y, m-1, d, hh, mm),
+        cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0,
+      });
+    });
+
+    // Calcular métricas por ingrediente
+    const filas = Object.values(ingMap).map(ing => {
+      const regs = ing.registros.sort((a,b) => a.ts - b.ts);
+      const primero = regs[0].cantidad;
+      const ultimo = regs[regs.length-1].cantidad;
+      // Suma de bajadas = consumo total; suma de subidas = entradas totales
+      let consumoTotal = 0, entradaTotal = 0;
+      for (let i = 1; i < regs.length; i++) {
+        const diff = regs[i].cantidad - regs[i-1].cantidad;
+        if (diff < 0) consumoTotal += Math.abs(diff);
+        else entradaTotal += diff;
+      }
+      return { ...ing, primero, ultimo, diff: ultimo - primero, consumoTotal, entradaTotal, nConteos: regs.length };
+    }).filter(f => f.consumoTotal > 0.001 || f.entradaTotal > 0.001 || Math.abs(f.diff) > 0.001);
+
+    if (!filas.length) {
+      cont.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+        <div style="font-size:40px;margin-bottom:.5rem">🤷</div>
+        <div style="font-weight:700;font-size:15px">Sin diferencias detectadas en ${mesLabel}</div>
+      </div>`;
+      return;
+    }
+
+    // KPIs del mes
+    const totalConsumo = filas.reduce((s,f) => s+f.consumoTotal, 0);
+    const topConsumo = [...filas].sort((a,b) => b.consumoTotal-a.consumoTotal)[0];
+    const topEntrada = [...filas].sort((a,b) => b.entradaTotal-a.entradaTotal)[0];
+    const fechas = [...new Set(conteosMes.map(h=>h.fecha))].sort();
+
+    // Agrupar por categoría
+    const cats = {};
+    filas.forEach(f => { (cats[f.categoria] = cats[f.categoria]||[]).push(f); });
+
+    cont.innerHTML = `
+      <!-- Header -->
+      <div class="card" style="padding:.85rem 1.1rem;margin-bottom:.85rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+          <div>
+            <div style="font-size:16px;font-weight:800;letter-spacing:-.01em;text-transform:capitalize">${mesLabel}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">${fechas.length} conteos · ${fechas[0]} → ${fechas[fechas.length-1]}</div>
+          </div>
+          <span class="badge badge-orange" style="font-size:12px">${filas.length} ingredientes con movimiento</span>
         </div>
-        <span id="chev-rep-${cat}" style="color:var(--text2);font-size:16px;transition:transform .3s;display:inline-block;transform:${abierta?'rotate(180deg)':'rotate(0deg)'}">▾</span>
       </div>
-      <div id="cat-rep-${cat}" style="padding:0 1rem;max-height:${abierta?'3000px':'0'};overflow:hidden;transition:max-height .35s ease;${abierta?'padding-bottom:1rem':''}">
-        ${ingHTML}
+
+      <!-- KPIs -->
+      <div class="grid4" style="margin-bottom:.85rem">
+        <div class="card" style="padding:.85rem">
+          <div style="font-size:20px;font-weight:800;color:var(--red);font-variant-numeric:tabular-nums">${fmt2(totalConsumo)}</div>
+          <div class="sl">Total consumo mes</div>
+        </div>
+        <div class="card" style="padding:.85rem">
+          <div style="font-size:13px;font-weight:700;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topConsumo?.nombre||'—'}</div>
+          <div class="sl">Más consumido</div>
+          ${topConsumo?`<div style="font-size:11px;color:var(--red);font-weight:700">${fmt2(topConsumo.consumoTotal)} ${topConsumo.unidad}</div>`:''}
+        </div>
+        <div class="card" style="padding:.85rem">
+          <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topEntrada?.nombre||'—'}</div>
+          <div class="sl">Mayor entrada</div>
+          ${topEntrada?`<div style="font-size:11px;color:var(--green);font-weight:700">+${fmt2(topEntrada.entradaTotal)} ${topEntrada.unidad}</div>`:''}
+        </div>
+        <div class="card" style="padding:.85rem">
+          <div style="font-size:20px;font-weight:800">${fechas.length}</div>
+          <div class="sl">Conteos del mes</div>
+        </div>
       </div>
+
+      <!-- Por categoría -->
+      ${Object.keys(cats).sort().map(cat => {
+        const items = cats[cat].sort((a,b) => b.consumoTotal - a.consumoTotal);
+        const maxC = Math.max(...items.map(f=>f.consumoTotal), 0.001);
+        return `
+        <div class="card" style="margin-bottom:.65rem;padding:0;overflow:hidden">
+          <div style="padding:.75rem 1rem;background:var(--bg3);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;font-weight:700">${cat}</span>
+            <span style="font-size:11px;color:var(--text2)">${items.length} ${items.length===1?'ingrediente':'ingredientes'}</span>
+          </div>
+          ${items.map((f,i,arr) => `
+          <div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-bottom:${i<arr.length-1?'.5px solid var(--border)':'none'}">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
+              <div style="display:flex;align-items:center;gap:.75rem;margin-top:4px;flex-wrap:wrap">
+                ${f.consumoTotal > 0.001 ? `<span style="font-size:11px;color:var(--red);font-weight:700">↓ ${fmt2(f.consumoTotal)} ${f.unidad}</span>` : ''}
+                ${f.entradaTotal > 0.001 ? `<span style="font-size:11px;color:var(--green);font-weight:700">↑ ${fmt2(f.entradaTotal)} ${f.unidad}</span>` : ''}
+                <span style="font-size:10px;color:var(--text3)">${f.nConteos} conteos</span>
+              </div>
+              ${f.consumoTotal > 0.001 ? `<div style="height:4px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:5px">
+                <div style="height:100%;width:${Math.round(f.consumoTotal/maxC*100)}%;background:var(--red);border-radius:99px"></div>
+              </div>` : ''}
+            </div>
+            <div style="text-align:right;flex-shrink:0;min-width:70px">
+              <div style="font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums">${fmt2(f.primero)} → ${fmt2(f.ultimo)}</div>
+              <div style="font-size:12px;font-weight:700;color:${f.diff<0?'var(--red)':f.diff>0?'var(--green)':'var(--text2)'};font-variant-numeric:tabular-nums">${f.diff>0?'+':''}${fmt2(f.diff)} ${f.unidad}</div>
+            </div>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+
+      ${ROL === 'admin' ? _diagReportes() : ''}
+    `;
+    return;
+  }
+
+  // Agrupar por fecha única de conteo
+  const porFecha = {};
+  todosConteos.forEach(h => {
+    const f = h.fecha || 'sin-fecha';
+    if (!porFecha[f]) porFecha[f] = {};
+    // Guardar la lectura más reciente de ese ingrediente en esa fecha
+    const id = h.ingId || h.nombre;
+    porFecha[f][id] = {
+      nombre: h.nombre,
+      ingId: h.ingId,
+      cantidad: parseFloat(h.stockNuevo ?? h.cantidad) || 0,
+      unidad: DB.ingredientes.find(i => (i.id === h.ingId) || (i.nombre === h.nombre))?.unidad || '',
+      categoria: DB.ingredientes.find(i => (i.id === h.ingId) || (i.nombre === h.nombre))?.categoria || 'Otros',
+    };
+  });
+
+  // Ordenar fechas de conteo
+  const fechasOrdenadas = Object.keys(porFecha).filter(f => f !== 'sin-fecha').sort();
+  if (fechasOrdenadas.length < 2) {
+    cont.innerHTML = `
+      <div class="card" style="text-align:center;padding:2rem">
+        <div style="font-size:40px;margin-bottom:.5rem">📋</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:.35rem">Necesitas al menos 2 conteos</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.5">
+          Tienes <strong>${fechasOrdenadas.length}</strong> ${fechasOrdenadas.length===1?'fecha':'fechas'} de conteo registrada${fechasOrdenadas.length===1?'':'s'}.<br>
+          Realiza un conteo semanal más para ver la comparativa.
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Elegir el par según selector
+  const idxB = fechasOrdenadas.length - 1 - (offset * 2);
+  const idxA = idxB - 1;
+  if (idxA < 0) {
+    cont.innerHTML = `<div class="card empty">No hay suficientes conteos para este período.</div>`;
+    return;
+  }
+  const fechaA = fechasOrdenadas[idxA];
+  const fechaB = fechasOrdenadas[idxB];
+  const datoA = porFecha[fechaA];
+  const datoB = porFecha[fechaB];
+
+  // Cruzar ingredientes
+  const todos = [...new Set([...Object.keys(datoA), ...Object.keys(datoB)])];
+  const filas = todos.map(id => {
+    const a = datoA[id] || { cantidad: null };
+    const b = datoB[id] || { cantidad: null };
+    const info = DB.ingredientes.find(i => (i.id === id) || (i.nombre === (a.nombre||b.nombre))) || {};
+    const cantA = a.cantidad !== null ? a.cantidad : null;
+    const cantB = b.cantidad !== null ? b.cantidad : null;
+    const diff = (cantB !== null && cantA !== null) ? cantB - cantA : null;
+    return {
+      nombre: a.nombre || b.nombre || info.nombre || id,
+      categoria: a.categoria || b.categoria || info.categoria || 'Otros',
+      unidad: a.unidad || b.unidad || info.unidad || '',
+      cantA, cantB, diff,
+    };
+  }).filter(f => f.diff !== null && Math.abs(f.diff) > 0.001);
+
+  if (!filas.length) {
+    cont.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:40px;margin-bottom:.5rem">🤷</div>
+      <div style="font-weight:700;font-size:15px">Sin diferencias entre estos conteos</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:.35rem">El stock fue exactamente igual en ambas fechas.</div>
     </div>`;
-  }).filter(Boolean).join('');
+    return;
+  }
 
-  // Summary KPIs (top of report)
-  let totalConsumido = 0;
-  let topIng = { nombre:'—', total: 0, unidad:'' };
-  let porCategoriaTotal = {};
-  Object.entries(porIngrediente).forEach(([nombre, regs]) => {
-    const ing = DB.ingredientes.find(i => i.nombre === nombre);
-    if (!ing) return;
-    const total = semanas.reduce((s,sm) => s + consumoEnSemana(regs, sm.ini, sm.fin), 0);
-    totalConsumido += total;
-    if (total > topIng.total) topIng = { nombre, total, unidad: ing.unidad };
-    porCategoriaTotal[ing.categoria||'Otros'] = (porCategoriaTotal[ing.categoria||'Otros']||0) + total;
-  });
-  const topCat = Object.entries(porCategoriaTotal).sort((a,b) => b[1]-a[1])[0];
-  // Tendencia última semana vs anterior
-  let consumoActual = 0, consumoPrevia = 0;
-  Object.entries(porIngrediente).forEach(([, regs]) => {
-    if (semanas.length >= 1) consumoActual += consumoEnSemana(regs, semanas[semanas.length-1].ini, semanas[semanas.length-1].fin);
-    if (semanas.length >= 2) consumoPrevia += consumoEnSemana(regs, semanas[semanas.length-2].ini, semanas[semanas.length-2].fin);
-  });
-  const trend = consumoPrevia > 0 ? ((consumoActual - consumoPrevia) / consumoPrevia) * 100 : 0;
-  const trendColor = Math.abs(trend) < 5 ? 'var(--text2)' : trend > 0 ? 'var(--red)' : 'var(--green)';
+  // KPIs
+  const bajaron = filas.filter(f => f.diff < 0);
+  const subieron = filas.filter(f => f.diff > 0);
+  const maxBaja = bajaron.reduce((m,f) => Math.abs(f.diff) > Math.abs(m.diff||0) ? f : m, {});
+  const maxSubida = subieron.reduce((m,f) => f.diff > (m.diff||0) ? f : m, {});
 
-  const summaryHTML = totalConsumido > 0 ? `
-    <div class="grid4" style="margin-bottom:1rem">
-      <div class="card" style="padding:.95rem 1rem">
-        <div class="metric" style="color:var(--accent);font-size:24px">${fmt(totalConsumido)}</div>
-        <div class="metric-label">Total consumido (${nSemanas} sem)</div>
+  // Agrupar por categoría
+  const cats = {};
+  filas.forEach(f => { (cats[f.categoria] = cats[f.categoria]||[]).push(f); });
+
+
+  cont.innerHTML = `
+    <!-- Header de fechas -->
+    <div class="card" style="padding:.85rem 1.1rem;margin-bottom:.85rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="text-align:center">
+          <div class="sl">Conteo anterior</div>
+          <div style="font-size:15px;font-weight:700">${fechaA}</div>
+        </div>
+        <div style="font-size:22px;color:var(--text2)">→</div>
+        <div style="text-align:center">
+          <div class="sl">Conteo reciente</div>
+          <div style="font-size:15px;font-weight:700;color:var(--accent)">${fechaB}</div>
+        </div>
       </div>
-      <div class="card" style="padding:.95rem 1rem">
-        <div class="metric" style="font-size:17px;letter-spacing:-.01em">${topIng.nombre}</div>
-        <div class="metric-label">Top ingrediente · ${fmt(topIng.total)} ${topIng.unidad}</div>
+      <div style="font-size:12px;color:var(--text2)">${filas.length} ingredientes con diferencia</div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid4" style="margin-bottom:.85rem">
+      <div class="card" style="padding:.85rem">
+        <div style="font-size:22px;font-weight:800;color:var(--red)">${bajaron.length}</div>
+        <div class="sl">Bajaron (consumo)</div>
       </div>
-      <div class="card" style="padding:.95rem 1rem">
-        <div class="metric" style="font-size:17px;letter-spacing:-.01em">${topCat ? topCat[0] : '—'}</div>
-        <div class="metric-label">Top categoría</div>
+      <div class="card" style="padding:.85rem">
+        <div style="font-size:22px;font-weight:800;color:var(--green)">${subieron.length}</div>
+        <div class="sl">Subieron (entradas)</div>
       </div>
-      <div class="card" style="padding:.95rem 1rem">
-        <div class="metric" style="font-size:22px;color:${trendColor}">${trend > 0 ? '↑' : trend < 0 ? '↓' : '·'} ${Math.abs(trend).toFixed(0)}%</div>
-        <div class="metric-label">Vs semana anterior</div>
+      <div class="card" style="padding:.85rem;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${maxBaja.nombre||'—'}</div>
+        <div class="sl">Mayor bajada</div>
+        ${maxBaja.diff!==undefined?`<div style="font-size:12px;color:var(--red);font-weight:700">${fmt2(maxBaja.diff)} ${maxBaja.unidad}</div>`:''}
+      </div>
+      <div class="card" style="padding:.85rem;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${maxSubida.nombre||'—'}</div>
+        <div class="sl">Mayor entrada</div>
+        ${maxSubida.diff!==undefined?`<div style="font-size:12px;color:var(--green);font-weight:700">+${fmt2(maxSubida.diff)} ${maxSubida.unidad}</div>`:''}
       </div>
     </div>
-  ` : '';
 
-  // Panel de diagnóstico — cuántos datos hay realmente
-  function _diagReportes() {
-    const total = DB.historial.length;
-    const conteos = DB.historial.filter(h => h.tipo==='conteo' && h.nombre && !h.nombre.startsWith('📝'));
-    const fechasConteo = [...new Set(conteos.map(h => h.fecha))].filter(Boolean).sort();
-    const ingsConteo = [...new Set(conteos.map(h => h.nombre))];
-    // ingredientes con ≥2 conteos en fechas distintas (los usables para consumo)
-    const usables = ingsConteo.filter(nom => {
-      const fechas = [...new Set(conteos.filter(h=>h.nombre===nom).map(h=>h.fecha))];
-      return fechas.length >= 2;
-    });
-    const primera = fechasConteo[0];
-    const ultima = fechasConteo[fechasConteo.length-1];
-    const capPct = Math.min(100, Math.round(total/5000*100));
-    const capColor = total >= 4500 ? 'var(--red)' : total >= 3000 ? 'var(--yellow)' : 'var(--green)';
-    return `
-    <div class="card" style="margin-top:.75rem;padding:1rem 1.1rem">
-      <div class="sl" style="margin-bottom:.75rem">🔎 Diagnóstico de tus datos</div>
-      <div class="grid2" style="gap:.6rem;margin-bottom:.6rem">
-        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
-          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${total}</div>
-          <div class="sl" style="margin-top:2px">Movimientos guardados</div>
+    <!-- Por categoría -->
+    ${Object.keys(cats).sort().map(cat => {
+      const items = cats[cat].sort((a,b) => a.diff - b.diff); // bajadas primero
+      return `
+      <div class="card" style="margin-bottom:.65rem;padding:0;overflow:hidden">
+        <div style="padding:.75rem 1rem;background:var(--bg3);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;font-weight:700">${cat}</span>
+          <span style="font-size:11px;color:var(--text2)">${items.length} ${items.length===1?'ingrediente':'ingredientes'}</span>
         </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
-          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${conteos.length}</div>
-          <div class="sl" style="margin-top:2px">Registros de conteo</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
-          <div style="font-size:22px;font-weight:800;color:${usables.length?'var(--green)':'var(--text2)'};font-variant-numeric:tabular-nums">${usables.length}</div>
-          <div class="sl" style="margin-top:2px">Ingredientes usables*</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
-          <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${fechasConteo.length}</div>
-          <div class="sl" style="margin-top:2px">Fechas con conteo</div>
-        </div>
-      </div>
-      ${primera ? `<div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">📅 Datos desde <strong style="color:var(--text)">${primera}</strong> hasta <strong style="color:var(--text)">${ultima}</strong></div>` : ''}
-      <!-- barra de capacidad -->
-      <div class="sl" style="margin-bottom:4px">Capacidad de historial · ${total} / 5.000</div>
-      <div style="height:7px;background:var(--bg3);border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:${capPct}%;background:${capColor};border-radius:99px"></div>
-      </div>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px">*Usables = ingredientes con al menos 2 conteos en fechas distintas (lo mínimo para calcular consumo).</div>
-    </div>`;
-  }
+        ${items.map((f,i,arr) => {
+          const esBaja = f.diff < 0;
+          const color = esBaja ? 'var(--red)' : 'var(--green)';
+          const icon = esBaja ? '↓' : '↑';
+          const maxAbs = Math.max(...arr.map(x => Math.abs(x.diff)));
+          const pct = maxAbs > 0 ? Math.round(Math.abs(f.diff)/maxAbs*100) : 0;
+          return `<div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-bottom:${i<arr.length-1?'.5px solid var(--border)':'none'}">
+            <div style="width:28px;height:28px;border-radius:50%;background:${color}22;display:flex;align-items:center;justify-content:center;color:${color};font-size:15px;font-weight:800;flex-shrink:0">${icon}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">${fmt2(f.cantA)} → ${fmt2(f.cantB)} ${f.unidad}</div>
+              <div style="height:4px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:5px">
+                <div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div>
+              </div>
+            </div>
+            <div style="font-size:14px;font-weight:800;color:${color};font-variant-numeric:tabular-nums;flex-shrink:0;text-align:right;min-width:70px">
+              ${esBaja?'':'+'}${fmt2(f.diff)} ${f.unidad}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}
 
-  document.getElementById('reporte-content').innerHTML = (html ? summaryHTML : '') + (html || `<div class="card" style="text-align:center;padding:1.5rem"><div style="font-size:32px;margin-bottom:.5rem">📊</div><div style="font-weight:600;margin-bottom:.25rem">Aún no hay consumo para mostrar</div><div style="font-size:12px;color:var(--text2);line-height:1.5">El consumo se calcula entre dos conteos del mismo ingrediente.<br>Cuando tengas 2 conteos en fechas distintas, aparecerá aquí.</div></div>`) + (ROL === 'admin' ? _diagReportes() : '');
+    ${ROL === 'admin' ? _diagReportes() : ''}
+  `;
 }
 window.renderReportes = renderReportes;
 window._toggleReporteCat = (cat) => {
