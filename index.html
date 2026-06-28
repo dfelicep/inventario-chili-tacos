@@ -439,9 +439,9 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="sb" style="margin-bottom:.25rem">
       <h2>📊 Comparativa de conteos</h2>
       <select id="reporte-conteo-sel" onchange="renderReportes()" style="width:auto">
-        <option value="0">Último conteo vs anterior</option>
-        <option value="1">Antepenúltimo vs antes</option>
-        <option value="mes">Mes completo</option>
+        <option value="0">Últimos 2 (sáb + mié)</option>
+        <option value="1">Los 2 anteriores</option>
+        <option value="mes">Mes completo (mié + sáb)</option>
         <option value="mes-ant">Mes anterior</option>
       </select>
     </div>
@@ -3039,12 +3039,14 @@ function renderReportes() {
     const mesFin = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0, 23, 59, 59);
     const mesLabel = mesRef.toLocaleDateString('es-CL', {month:'long', year:'numeric'});
 
-    // Conteos del mes filtrados
+    // Conteos del mes — solo miércoles y sábados
     const conteosMes = todosConteos.filter(h => {
       if (!h.fecha) return false;
       const [y,m,d] = h.fecha.split('-').map(Number);
       const fd = new Date(y, m-1, d);
-      return fd >= mesIni && fd <= mesFin;
+      if (fd < mesIni || fd > mesFin) return false;
+      const dia = fd.getDay();
+      return dia === 3 || dia === 6; // solo mié y sáb
     });
 
     if (!conteosMes.length) {
@@ -3202,8 +3204,23 @@ function renderReportes() {
     }
   });
 
-  // Ordenar fechas de conteo
-  const fechasOrdenadas = Object.keys(porFecha).filter(f => f !== 'sin-fecha').sort();
+  // Ordenar fechas — solo miércoles (3) y sábados (6)
+  // Si no hay suficientes de esos días, acepta cualquier fecha con ≥3 ingredientes
+  function esDiaConteo(fechaStr) {
+    if (!fechaStr) return false;
+    const [y,m,d] = fechaStr.split('-').map(Number);
+    const dia = new Date(y, m-1, d).getDay();
+    return dia === 3 || dia === 6; // 3=miércoles, 6=sábado
+  }
+  let fechasOrdenadas = Object.keys(porFecha)
+    .filter(f => f !== 'sin-fecha' && esDiaConteo(f))
+    .sort();
+  // Fallback: si no hay suficientes mié/sáb, usar días con ≥3 ingredientes
+  if (fechasOrdenadas.length < 2) {
+    fechasOrdenadas = Object.keys(porFecha)
+      .filter(f => f !== 'sin-fecha' && Object.keys(porFecha[f]).length >= 3)
+      .sort();
+  }
   if (fechasOrdenadas.length < 2) {
     cont.innerHTML = `
       <div class="card" style="text-align:center;padding:2rem">
@@ -3272,12 +3289,12 @@ function renderReportes() {
       <div style="display:flex;align-items:center;gap:.75rem">
         <div style="text-align:center">
           <div class="sl">Conteo anterior</div>
-          <div style="font-size:15px;font-weight:700">${fechaA}</div>
+          <div style="font-size:15px;font-weight:700">${fechaA} <span style="font-size:11px;color:var(--text2);font-weight:500">(${new Date(fechaA+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
         </div>
         <div style="font-size:22px;color:var(--text2)">→</div>
         <div style="text-align:center">
           <div class="sl">Conteo reciente</div>
-          <div style="font-size:15px;font-weight:700;color:var(--accent)">${fechaB}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--accent)">${fechaB} <span style="font-size:11px;color:var(--accent2);font-weight:500">(${new Date(fechaB+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
         </div>
       </div>
       <div style="font-size:12px;color:var(--text2)">${filas.length} ingredientes con diferencia</div>
