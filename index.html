@@ -447,7 +447,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div style="font-size:12px;color:var(--text2)">Qué bajó (consumiste) y qué subió (recibiste) entre dos conteos</div>
   </div>
-  <div id="reporte-content"></div>
+  <div id="rep-cont" data-filtro="todos" data-vista="categorias"></div>
 </div>
 
 <!-- PÁGINA COSTOS -->
@@ -3016,8 +3016,11 @@ function _diagReportes() {
 }
 
 function renderReportes() {
-  const cont = document.getElementById('reporte-content');
+  const cont = document.getElementById('rep-cont');
   if (!cont) return;
+  cont.id = 'rep-cont'; // alias para dataset
+  const _filtro = cont.dataset.filtro || 'todos';
+  const _vista = cont.dataset.vista || 'categorias';
   const offset = document.getElementById('reporte-conteo-sel')?.value || '0';
   const esMes = offset === 'mes' || offset === 'mes-ant';
 
@@ -3272,87 +3275,154 @@ function renderReportes() {
     return;
   }
 
-  // KPIs
+  // KPIs + análisis
   const bajaron = filas.filter(f => f.diff < 0);
   const subieron = filas.filter(f => f.diff > 0);
   const maxBaja = bajaron.reduce((m,f) => Math.abs(f.diff) > Math.abs(m.diff||0) ? f : m, {});
   const maxSubida = subieron.reduce((m,f) => f.diff > (m.diff||0) ? f : m, {});
 
+  // Análisis inteligente por ingrediente
+  const analisis = filas.map(f => {
+    const ing = DB.ingredientes.find(i => String(i.nombre||'').trim().toLowerCase() === (f.nombre||'').trim().toLowerCase()) || {};
+    const minimo = Number(ing.minimo) || 0;
+    const stockActual = f.cantB !== null ? f.cantB : 0;
+    const consumoSemana = f.diff < 0 ? Math.abs(f.diff) : 0;
+    // Días que alcanza al ritmo de consumo de esta semana (7 días entre conteos)
+    const diasAlcanza = consumoSemana > 0 ? Math.round(stockActual / (consumoSemana / 7)) : 99;
+    // Semáforo
+    let alerta = null;
+    if (f.diff < 0 && stockActual <= minimo * 0.5) alerta = { color: 'var(--red)', icon: '🔴', txt: 'Crítico · bajo el 50% del mínimo' };
+    else if (f.diff < 0 && stockActual <= minimo) alerta = { color: 'var(--yellow)', icon: '🟡', txt: 'Bajo mínimo' };
+    else if (f.diff < 0 && diasAlcanza <= 5) alerta = { color: 'var(--accent)', icon: '🟠', txt: `Alcanza ~${diasAlcanza} días` };
+    return { ...f, minimo, stockActual, consumoSemana, diasAlcanza, alerta, ing };
+  });
+  const criticos = analisis.filter(a => a.alerta?.color === 'var(--red)');
+  const advertencias = analisis.filter(a => a.alerta?.color === 'var(--yellow)' || a.alerta?.color === 'var(--accent)');
+
+  // Estado del filtro y vista (guardados en el DOM)
+  const filasVis = _filtro === 'bajaron' ? analisis.filter(f=>f.diff<0)
+    : _filtro === 'subieron' ? analisis.filter(f=>f.diff>0)
+    : analisis;
+
   // Agrupar por categoría
   const cats = {};
-  filas.forEach(f => { (cats[f.categoria] = cats[f.categoria]||[]).push(f); });
+  filasVis.forEach(f => { (cats[f.categoria] = cats[f.categoria]||[]).push(f); });
 
+  function filaHTML(f, isLast, showCat) {
+    const esBaja = f.diff < 0;
+    const color = esBaja ? 'var(--red)' : 'var(--green)';
+    const icon = esBaja ? '↓' : '↑';
+    const maxAbs = Math.max(...filasVis.map(x => Math.abs(x.diff)));
+    const pct = maxAbs > 0 ? Math.round(Math.abs(f.diff)/maxAbs*100) : 0;
+    return `<div style="display:flex;align-items:center;gap:.75rem;padding:.65rem 1rem;border-bottom:${isLast?'none':'.5px solid var(--border)'}">
+      <div style="width:26px;height:26px;border-radius:50%;background:${color}22;display:flex;align-items:center;justify-content:center;color:${color};font-size:14px;font-weight:800;flex-shrink:0">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</span>
+          ${showCat ? `<span style="font-size:10px;color:var(--text3)">${f.categoria}</span>` : ''}
+          ${f.alerta ? `<span style="font-size:10px;color:${f.alerta.color};font-weight:700">${f.alerta.icon} ${f.alerta.txt}</span>` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${fmt2(f.cantA)} → ${fmt2(f.cantB)} ${f.unidad}</div>
+        <div style="height:3px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:4px">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div>
+        </div>
+      </div>
+      <div style="font-size:14px;font-weight:800;color:${color};font-variant-numeric:tabular-nums;flex-shrink:0;min-width:64px;text-align:right">
+        ${esBaja?'':'+'}${fmt2(f.diff)} ${f.unidad}
+      </div>
+    </div>`;
+  }
 
   cont.innerHTML = `
     <!-- Header de fechas -->
-    <div class="card" style="padding:.85rem 1.1rem;margin-bottom:.85rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+    <div class="card" style="padding:.85rem 1.1rem;margin-bottom:.65rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
       <div style="display:flex;align-items:center;gap:.75rem">
         <div style="text-align:center">
           <div class="sl">Conteo anterior</div>
-          <div style="font-size:15px;font-weight:700">${fechaA} <span style="font-size:11px;color:var(--text2);font-weight:500">(${new Date(fechaA+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
+          <div style="font-size:14px;font-weight:700">${fechaA} <span style="font-size:11px;color:var(--text2)">(${new Date(fechaA+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
         </div>
-        <div style="font-size:22px;color:var(--text2)">→</div>
+        <div style="font-size:20px;color:var(--text2)">→</div>
         <div style="text-align:center">
           <div class="sl">Conteo reciente</div>
-          <div style="font-size:15px;font-weight:700;color:var(--accent)">${fechaB} <span style="font-size:11px;color:var(--accent2);font-weight:500">(${new Date(fechaB+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent)">${fechaB} <span style="font-size:11px;color:var(--accent2)">(${new Date(fechaB+'T12:00').toLocaleDateString('es-CL',{weekday:'short'})})</span></div>
         </div>
       </div>
-      <div style="font-size:12px;color:var(--text2)">${filas.length} ingredientes con diferencia</div>
+      <div style="font-size:12px;color:var(--text2)">${filas.length} con diferencia</div>
     </div>
 
     <!-- KPIs -->
-    <div class="grid4" style="margin-bottom:.85rem">
-      <div class="card" style="padding:.85rem">
+    <div class="grid4" style="margin-bottom:.65rem">
+      <div class="card" style="padding:.75rem;cursor:pointer" onclick="document.getElementById('rep-cont').dataset.filtro='bajaron';renderReportes()">
         <div style="font-size:22px;font-weight:800;color:var(--red)">${bajaron.length}</div>
-        <div class="sl">Bajaron (consumo)</div>
+        <div class="sl">↓ Bajaron</div>
       </div>
-      <div class="card" style="padding:.85rem">
+      <div class="card" style="padding:.75rem;cursor:pointer" onclick="document.getElementById('rep-cont').dataset.filtro='subieron';renderReportes()">
         <div style="font-size:22px;font-weight:800;color:var(--green)">${subieron.length}</div>
-        <div class="sl">Subieron (entradas)</div>
+        <div class="sl">↑ Subieron</div>
       </div>
-      <div class="card" style="padding:.85rem;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${maxBaja.nombre||'—'}</div>
+      <div class="card" style="padding:.75rem;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${maxBaja.nombre||'—'}</div>
         <div class="sl">Mayor bajada</div>
-        ${maxBaja.diff!==undefined?`<div style="font-size:12px;color:var(--red);font-weight:700">${fmt2(maxBaja.diff)} ${maxBaja.unidad}</div>`:''}
+        ${maxBaja.diff!==undefined?`<div style="font-size:11px;color:var(--red);font-weight:700">${fmt2(maxBaja.diff)} ${maxBaja.unidad}</div>`:''}
       </div>
-      <div class="card" style="padding:.85rem;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${maxSubida.nombre||'—'}</div>
+      <div class="card" style="padding:.75rem;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:var(--green);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${maxSubida.nombre||'—'}</div>
         <div class="sl">Mayor entrada</div>
-        ${maxSubida.diff!==undefined?`<div style="font-size:12px;color:var(--green);font-weight:700">+${fmt2(maxSubida.diff)} ${maxSubida.unidad}</div>`:''}
+        ${maxSubida.diff!==undefined?`<div style="font-size:11px;color:var(--green);font-weight:700">+${fmt2(maxSubida.diff)} ${maxSubida.unidad}</div>`:''}
       </div>
     </div>
 
-    <!-- Por categoría -->
+    <!-- Alertas automáticas -->
+    ${criticos.length || advertencias.length ? `
+    <div class="card" style="margin-bottom:.65rem;padding:.85rem 1rem;background:linear-gradient(135deg,#1f0606,#150404);border:1px solid var(--red-bd)">
+      <div class="sl" style="color:var(--red);margin-bottom:.6rem">⚠ Requieren atención</div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${[...criticos,...advertencias].slice(0,5).map(a => `
+        <div style="display:flex;align-items:center;gap:.75rem;font-size:12px">
+          <span>${a.alerta.icon}</span>
+          <span style="flex:1;font-weight:600">${a.nombre}</span>
+          <span style="color:${a.alerta.color};font-weight:700">${fmt2(a.stockActual)} ${a.unidad}</span>
+          <span style="color:var(--text3)">mín ${fmt2(a.minimo)}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Controles: filtro + vista -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem">
+      <div style="display:flex;gap:.35rem">
+        ${['todos','bajaron','subieron'].map(f => `
+        <button onclick="document.getElementById('rep-cont').dataset.filtro='${f}';renderReportes()"
+          style="padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:.5px solid ${_filtro===f?'var(--accent)':'var(--border)'};background:${_filtro===f?'var(--accent)':'transparent'};color:${_filtro===f?'#fff':'var(--text2)'}">
+          ${f==='todos'?'Todos':f==='bajaron'?'↓ Bajaron':'↑ Subieron'}
+        </button>`).join('')}
+      </div>
+      <div style="display:flex;gap:.35rem">
+        ${['categorias','lista'].map(v => `
+        <button onclick="document.getElementById('rep-cont').dataset.vista='${v}';renderReportes()"
+          style="padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:.5px solid ${_vista===v?'var(--accent)':'var(--border)'};background:${_vista===v?'var(--accent)':'transparent'};color:${_vista===v?'#fff':'var(--text2)'}">
+          ${v==='categorias'?'Por categoría':'Lista'}
+        </button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Contenido: categorías o lista plana -->
+    ${_vista === 'lista' ? `
+    <div class="card" style="padding:0;overflow:hidden">
+      ${[...filasVis].sort((a,b) => Math.abs(b.diff)-Math.abs(a.diff)).map((f,i,arr) => filaHTML(f, i===arr.length-1, true)).join('')}
+    </div>` : `
     ${Object.keys(cats).sort().map(cat => {
-      const items = cats[cat].sort((a,b) => a.diff - b.diff); // bajadas primero
+      const items = cats[cat].sort((a,b) => Math.abs(b.diff)-Math.abs(a.diff));
       return `
-      <div class="card" style="margin-bottom:.65rem;padding:0;overflow:hidden">
-        <div style="padding:.75rem 1rem;background:var(--bg3);display:flex;justify-content:space-between;align-items:center">
+      <div class="card" style="margin-bottom:.5rem;padding:0;overflow:hidden">
+        <div style="padding:.65rem 1rem;background:var(--bg3);display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
           <span style="font-size:12px;font-weight:700">${cat}</span>
-          <span style="font-size:11px;color:var(--text2)">${items.length} ${items.length===1?'ingrediente':'ingredientes'}</span>
+          <span style="font-size:11px;color:var(--text2)">${items.length} ${items.length===1?'ítem':'ítems'}</span>
         </div>
-        ${items.map((f,i,arr) => {
-          const esBaja = f.diff < 0;
-          const color = esBaja ? 'var(--red)' : 'var(--green)';
-          const icon = esBaja ? '↓' : '↑';
-          const maxAbs = Math.max(...arr.map(x => Math.abs(x.diff)));
-          const pct = maxAbs > 0 ? Math.round(Math.abs(f.diff)/maxAbs*100) : 0;
-          return `<div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-bottom:${i<arr.length-1?'.5px solid var(--border)':'none'}">
-            <div style="width:28px;height:28px;border-radius:50%;background:${color}22;display:flex;align-items:center;justify-content:center;color:${color};font-size:15px;font-weight:800;flex-shrink:0">${icon}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
-              <div style="font-size:11px;color:var(--text2);margin-top:2px">${fmt2(f.cantA)} → ${fmt2(f.cantB)} ${f.unidad}</div>
-              <div style="height:4px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:5px">
-                <div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div>
-              </div>
-            </div>
-            <div style="font-size:14px;font-weight:800;color:${color};font-variant-numeric:tabular-nums;flex-shrink:0;text-align:right;min-width:70px">
-              ${esBaja?'':'+'}${fmt2(f.diff)} ${f.unidad}
-            </div>
-          </div>`;
-        }).join('')}
+        <div>
+          ${items.map((f,i,arr) => filaHTML(f, i===arr.length-1, false)).join('')}
+        </div>
       </div>`;
-    }).join('')}
+    }).join('')}`}
 
     ${ROL === 'admin' ? _diagReportes() : ''}
   `;
