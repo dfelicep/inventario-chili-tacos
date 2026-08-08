@@ -2871,6 +2871,9 @@ function abrirEditorPreparacion(prepId = null) {
     modal.appendChild(card);
     document.body.appendChild(modal);
     refreshUI();
+    // Renderizar ingredientes DESPUÉS de que el DOM esté listo
+    renderIngs();
+    updateTotals();
 }
 window.abrirEditorPreparacion = abrirEditorPreparacion;
 
