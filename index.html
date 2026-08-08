@@ -61,11 +61,12 @@ h2{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
 }
 
 /* Bottom nav móvil */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(8,11,18,.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;z-index:80;padding-bottom:env(safe-area-inset-bottom,0px)}
-.bnb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.6rem .25rem;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;gap:4px;border:none;background:none;transition:color .15s;min-height:62px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(8,11,18,.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;z-index:80;padding-bottom:env(safe-area-inset-bottom,0px);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.bottom-nav::-webkit-scrollbar{display:none}
+.bnb{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.6rem .5rem;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;gap:4px;border:none;background:none;transition:color .15s;min-height:62px;min-width:68px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .bnb.active{color:var(--accent)}
 .bnb .icon{font-size:20px;line-height:1}
-.bnb .lbl{font-size:9px;line-height:1;letter-spacing:.02em}
+.bnb .lbl{font-size:9px;line-height:1;letter-spacing:.02em;white-space:nowrap}
 
 /* Responsive móvil */
 @media(max-width:768px){
@@ -296,6 +297,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
   <button class="bnb" id="bnb-ingredientes" onclick="goTab('ingredientes')"><span class="icon">📦</span><span class="lbl">Inventario</span></button>
   <button class="bnb" id="bnb-conteo" onclick="goTab('conteo')"><span class="icon">📝</span><span class="lbl">Conteo</span></button>
   <button class="bnb" id="bnb-compra" onclick="goTab('compra')"><span class="icon">🛒</span><span class="lbl">Compra</span></button>
+  <button class="bnb" id="bnb-costos" onclick="goTab('costos')"><span class="icon">💰</span><span class="lbl">Costos</span></button>
+  <button class="bnb" id="bnb-reportes" onclick="goTab('reportes')"><span class="icon">📈</span><span class="lbl">Reportes</span></button>
   <button class="bnb" id="bnb-historial" onclick="goTab('historial')"><span class="icon">🕐</span><span class="lbl">Movim.</span></button>
 </nav>
 <div class="main">
@@ -584,6 +587,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <select id="ing-equiv-label"><option value="kg">kg</option><option value="unidades">unidades</option><option value="tortillas">tortillas</option><option value="trozos">trozos</option><option value="litros">litros</option><option value="porciones">porciones</option><option value="kg cocido">kg cocido</option></select>
     </div>
   </div>
+  <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+  <textarea id="ing-nota" rows="2" placeholder="ej: Se cuenta por caja de 12 unidades. Proveedor: SUSARON." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5;transition:border-color .15s,box-shadow .15s"></textarea>
   <div style="display:flex;gap:.5rem;margin-top:1.25rem;justify-content:flex-end">
     <button class="btn btn-ghost" onclick="closeModal('modal-ing')">Cancelar</button>
     <button class="btn btn-primary" onclick="guardarIngrediente()">Guardar</button>
@@ -610,6 +615,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <select id="edit-equiv-label"><option value="kg">kg</option><option value="unidades">unidades</option><option value="tortillas">tortillas</option><option value="trozos">trozos</option><option value="litros">litros</option><option value="porciones">porciones</option><option value="kg cocido">kg cocido</option></select>
     </div>
   </div>
+  <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+  <textarea id="edit-nota" rows="2" placeholder="ej: Se pesa en seco. Proveedor habitual: Makro." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5;transition:border-color .15s,box-shadow .15s"></textarea>
   <div style="display:flex;gap:.5rem;margin-top:1.25rem;justify-content:flex-end">
     <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
     <button class="btn btn-primary" onclick="guardarEdit()">Guardar</button>
@@ -1110,6 +1117,9 @@ function goTab(t) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pg = document.getElementById('page-'+t);
   if (pg) pg.classList.add('active');
+  // Scroll del tab activo en nav móvil
+  const activeBtn = document.getElementById('bnb-'+t);
+  if (activeBtn) activeBtn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
   renderTab(t);
 }
 window.goTab = goTab;
@@ -1345,6 +1355,7 @@ function renderIngredientes() {
       <div style="font-size:24px;font-weight:800;color:${c.stock};line-height:1;margin-top:.625rem;letter-spacing:-.03em;font-family:var(--font-mono)">${fmt(i.stock)}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:3px">${i.unidad} · mín ${fmt(i.minimo)}</div>
       <div style="font-size:10.5px;color:${c.label};margin-top:4px;font-weight:500">${c.txt}</div>
+      ${i.nota ? `<div style="margin-top:6px;padding:.375rem .5rem;background:rgba(255,255,255,.04);border-radius:6px;border-left:2px solid rgba(255,255,255,.1);font-size:10.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtmlCompra(i.nota)}</div>` : ''}
       ${acciones}
     </div>`;
   }).join('') || '<div class="empty">Sin resultados</div>';
@@ -1912,13 +1923,13 @@ window._toggleReporteCat = (cat) => {
 };
 
 // CRUD INGREDIENTES (solo admin)
-function openIngModal() { if (ROL !== 'admin') { toast('Solo el administrador puede agregar ingredientes', '#450a0a', '#fca5a5'); return; } DB.editIngId = null; ['ing-nombre','ing-stock','ing-minimo','ing-equiv'].forEach(x => document.getElementById(x).value=''); poblarSelectCats('ing-cat'); document.getElementById('ing-title').textContent = 'Nuevo ingrediente'; document.getElementById('modal-ing').classList.add('open'); }
+function openIngModal() { if (ROL !== 'admin') { toast('Solo el administrador puede agregar ingredientes', '#450a0a', '#fca5a5'); return; } DB.editIngId = null; ['ing-nombre','ing-stock','ing-minimo','ing-equiv'].forEach(x => document.getElementById(x).value=''); document.getElementById('ing-nota').value=''; poblarSelectCats('ing-cat'); document.getElementById('ing-title').textContent = 'Nuevo ingrediente'; document.getElementById('modal-ing').classList.add('open'); }
 window.openIngModal = openIngModal;
-function openEditModal(id) { if (ROL !== 'admin') return; DB.editIngId = id; const i = DB.ingredientes.find(x => x.id === id); document.getElementById('edit-title').textContent = 'Editar: '+i.nombre; document.getElementById('edit-nombre').value = i.nombre; poblarSelectCats('edit-cat', i.categoria); document.getElementById('edit-unidad').value = i.unidad; document.getElementById('edit-stock').value = i.stock; document.getElementById('edit-minimo').value = i.minimo; document.getElementById('edit-equiv').value = i.equiv||''; const sel = document.getElementById('edit-equiv-label'); sel.value = i.equivLabel||'kg'; document.getElementById('edit-equiv-hint').textContent = getEquivHint(i.unidad); document.getElementById('modal-edit').classList.add('open'); }
+function openEditModal(id) { if (ROL !== 'admin') return; DB.editIngId = id; const i = DB.ingredientes.find(x => x.id === id); document.getElementById('edit-title').textContent = 'Editar: '+i.nombre; document.getElementById('edit-nombre').value = i.nombre; poblarSelectCats('edit-cat', i.categoria); document.getElementById('edit-unidad').value = i.unidad; document.getElementById('edit-stock').value = i.stock; document.getElementById('edit-minimo').value = i.minimo; document.getElementById('edit-equiv').value = i.equiv||''; const sel = document.getElementById('edit-equiv-label'); sel.value = i.equivLabel||'kg'; document.getElementById('edit-equiv-hint').textContent = getEquivHint(i.unidad); document.getElementById('edit-nota').value = i.nota||''; document.getElementById('modal-edit').classList.add('open'); }
 window.openEditModal = openEditModal;
-async function guardarEdit() { const i = DB.ingredientes.find(x => x.id === DB.editIngId); if (!i) return; i.nombre = document.getElementById('edit-nombre').value.trim(); i.categoria = document.getElementById('edit-cat').value; i.unidad = document.getElementById('edit-unidad').value; i.stock = parseFloat(document.getElementById('edit-stock').value)||0; i.minimo = parseFloat(document.getElementById('edit-minimo').value)||0; i.equiv = parseFloat(document.getElementById('edit-equiv').value)||0; i.equivLabel = document.getElementById('edit-equiv-label').value||'kg'; if (!i.frecuencia) i.frecuencia = 'semanal'; await saveDB(); closeModal('modal-edit'); renderIngredientes(); renderDash(); toast('✓ Ingrediente actualizado'); }
+async function guardarEdit() { const i = DB.ingredientes.find(x => x.id === DB.editIngId); if (!i) return; i.nombre = document.getElementById('edit-nombre').value.trim(); i.categoria = document.getElementById('edit-cat').value; i.unidad = document.getElementById('edit-unidad').value; i.stock = parseFloat(document.getElementById('edit-stock').value)||0; i.minimo = parseFloat(document.getElementById('edit-minimo').value)||0; i.equiv = parseFloat(document.getElementById('edit-equiv').value)||0; i.equivLabel = document.getElementById('edit-equiv-label').value||'kg'; i.nota = document.getElementById('edit-nota').value.trim(); if (!i.frecuencia) i.frecuencia = 'semanal'; await saveDB(); closeModal('modal-edit'); renderIngredientes(); renderDash(); toast('✓ Ingrediente actualizado'); }
 window.guardarEdit = guardarEdit;
-async function guardarIngrediente() { const nombre = document.getElementById('ing-nombre').value.trim(); if (!nombre) { alert('Ingresa un nombre'); return; } DB.ingredientes.push({id:uid(),nombre,categoria:document.getElementById('ing-cat').value,unidad:document.getElementById('ing-unidad').value,stock:parseFloat(document.getElementById('ing-stock').value)||0,minimo:parseFloat(document.getElementById('ing-minimo').value)||0,equiv:parseFloat(document.getElementById('ing-equiv').value)||0,equivLabel:document.getElementById('ing-equiv-label').value||'kg'}); await saveDB(); closeModal('modal-ing'); renderIngredientes(); renderDash(); toast('✓ Ingrediente agregado'); }
+async function guardarIngrediente() { const nombre = document.getElementById('ing-nombre').value.trim(); if (!nombre) { alert('Ingresa un nombre'); return; } const nota = document.getElementById('ing-nota').value.trim(); DB.ingredientes.push({id:uid(),nombre,categoria:document.getElementById('ing-cat').value,unidad:document.getElementById('ing-unidad').value,stock:parseFloat(document.getElementById('ing-stock').value)||0,minimo:parseFloat(document.getElementById('ing-minimo').value)||0,equiv:parseFloat(document.getElementById('ing-equiv').value)||0,equivLabel:document.getElementById('ing-equiv-label').value||'kg',nota}); await saveDB(); closeModal('modal-ing'); renderIngredientes(); renderDash(); toast('✓ Ingrediente agregado'); }
 window.guardarIngrediente = guardarIngrediente;
 async function elimIng(id) { if (ROL !== 'admin') return; if (!confirm('¿Eliminar este ingrediente?')) return; DB.ingredientes = DB.ingredientes.filter(i => i.id !== id); await saveDB(); renderIngredientes(); renderDash(); toast('Ingrediente eliminado','#450a0a','#fca5a5'); }
 window.elimIng = elimIng;
@@ -2387,6 +2398,7 @@ function renderRawMaterials() {
           <div style="font-size:12px;color:var(--accent);margin-top:3px;font-weight:600">$${price.toLocaleString('es-CL')}/${mat.unit} <span style="color:var(--text3);font-weight:400">·</span> <span style="color:var(--text2);font-weight:500">${sub}</span></div>
           ${hist?`<div style="font-size:10.5px;color:var(--text3);margin-top:2px">${hist}</div>`:''}
           ${alt?`<div style="font-size:10.5px;color:var(--text3);margin-top:1px">Alt: ${alt}</div>`:''}
+          ${mat.nota?`<div style="margin-top:5px;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:5px;border-left:2px solid rgba(255,255,255,.1);font-size:10.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(mat.nota)}</div>`:''}
         </div>
         <div style="display:flex;gap:.35rem;flex-shrink:0;margin-left:.75rem">
           <button class="btn btn-ghost btn-sm" onclick="registrarCompra('${mat.id}')" title="Actualizar precio">✏ Precio</button>
@@ -2399,7 +2411,7 @@ function renderRawMaterials() {
 }
 function registrarCompra(id) { const mat = rawMaterials.find(m=>m.id==id); if(!mat) return; const p = prompt(`Nuevo precio de "${mat.name}" (por ${mat.unit}):`, getLatestPrice(id)); if (p===null) return; const price = parseFloat(p); if(isNaN(price)||price<=0){alert('Precio inválido');return;} mat.priceHistory.push({date:nowStr(), price}); saveCostosToDB(); fullRefresh(); toast(`✓ ${mat.name}: $${price.toLocaleString('es-CL')}/${mat.unit}`); }
 window.registrarCompra = registrarCompra;
-function editarMP(id) { const mat = rawMaterials.find(m=>m.id==id); if(!mat) return; const newName = prompt('Nombre:', mat.name); if (newName&&newName.trim()) mat.name=newName.trim(); if (mat.unit==='litro') { const d=prompt('Densidad (g/L):', mat.density||1000); if(d&&!isNaN(parseFloat(d))) mat.density=parseFloat(d); } saveCostosToDB(); fullRefresh(); toast('✓ Actualizado'); }
+function editarMP(id) { const mat = rawMaterials.find(m=>m.id==id); if(!mat) return; const newName = prompt('Nombre:', mat.name); if (newName&&newName.trim()) mat.name=newName.trim(); if (mat.unit==='litro') { const d=prompt('Densidad (g/L):', mat.density||1000); if(d&&!isNaN(parseFloat(d))) mat.density=parseFloat(d); } const nuevaNota = prompt('Nota interna (proveedor, fecha, etc.):', mat.nota||''); if (nuevaNota !== null) mat.nota = nuevaNota.trim(); saveCostosToDB(); fullRefresh(); toast('✓ Actualizado'); }
 window.editarMP = editarMP;
 function eliminarMP(id) { if(!confirm('¿Eliminar?')) return; rawMaterials = rawMaterials.filter(m=>m.id!=id); preparations.forEach(p=>p.ingredients=p.ingredients.filter(i=>i.rawMaterialId!=id)); menuRecipes.forEach(r=>r.components=r.components.filter(c=>!(c.type==='raw'&&c.id==id))); saveCostosToDB(); fullRefresh(); toast('Eliminada','#450a0a','#fca5a5'); }
 window.eliminarMP = eliminarMP;
@@ -2495,6 +2507,7 @@ function renderPreparaciones() {
           <div style="text-align:right;font-size:12px;font-weight:600;color:var(--accent);padding:.5rem .75rem 0">
             $${perGram.toFixed(4)}/gr
           </div>`}
+          ${prep.nota ? `<div style="margin-top:.625rem;padding:.5rem .75rem;background:rgba(255,255,255,.04);border-radius:7px;border-left:2px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(prep.nota)}</div>` : ''}
         </div>
       </div>
     </div>`;
@@ -2526,6 +2539,7 @@ function abrirEditorPreparacion(prepId = null) {
     let ingredients = prep ? JSON.parse(JSON.stringify(prep.ingredients || [])) : [];
     let tieneProteina = prep ? (prep.tieneProteina !== false) : true;
     let pesoProteinaCocida = prep ? (prep.pesoProteinaCocida || 0) : 0;
+    let notaPrep = prep ? (prep.nota || '') : '';
 
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000';
@@ -2686,6 +2700,8 @@ function abrirEditorPreparacion(prepId = null) {
         </div>
         <div id="ings-container" style="max-height:260px;overflow-y:auto"></div>
         <div id="prep-total-display" style="margin-top:.5rem;font-size:12px;font-weight:600;color:var(--text2);text-align:right;line-height:1.6"></div>
+        <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+        <textarea id="prep-nota" rows="2" placeholder="ej: Merma calculada sobre 10kg tapapecho, peso cocido 6.75kg. Actualizar si cambia la proteína." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5;transition:border-color .15s,box-shadow .15s">${escapeHtml(notaPrep)}</textarea>
         <div style="display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end">
             <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
             <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
@@ -2745,18 +2761,21 @@ function abrirEditorPreparacion(prepId = null) {
                     return;
                 }
                 const finalIngs = ingredients.filter(i => (i.isOp && i.quantity > 0) || (i.rawMaterialId && i.quantity > 0));
+                const finalNota = document.getElementById('prep-nota')?.value.trim() || '';
                 if (isEdit) {
                     prep.name = newName;
                     prep.ingredients = finalIngs;
                     prep.tieneProteina = finalTieneProteina;
                     prep.pesoProteinaCocida = finalTieneProteina ? finalPesoCocido : 0;
+                    prep.nota = finalNota;
                 } else {
                     preparations.push({
                         id: genId('p'),
                         name: newName,
                         ingredients: finalIngs,
                         tieneProteina: finalTieneProteina,
-                        pesoProteinaCocida: finalTieneProteina ? finalPesoCocido : 0
+                        pesoProteinaCocida: finalTieneProteina ? finalPesoCocido : 0,
+                        nota: finalNota
                     });
                 }
                 modal.remove();
@@ -2805,6 +2824,10 @@ function renderEditableRecipeForm() {
   let html=`<div style="display:flex;gap:.5rem;margin-bottom:.5rem">
     <div style="flex:1"><label>Nombre</label><input id="editRecipeName" value="${escapeHtml(editingRecipeName)}"></div>
     <div style="width:120px"><label>Precio venta ($)</label><input id="editRecipePrice" type="number" value="${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.precioVenta||''}"></div>
+  </div>
+  <div style="margin-bottom:.625rem">
+    <label style="margin-top:0">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+    <textarea id="editRecipeNota" rows="2" placeholder="ej: Supuesto: 1 tortilla 9''. Revisar costo si cambia proveedor de proteína." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 12px;color:var(--text);font-size:12px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(menuRecipes.find(r=>r.id==currentEditingRecipeId)?.nota||'')}</textarea>
   </div>
   <div style="background:var(--bg3);border-radius:6px;padding:.3rem .5rem;font-size:10px;font-weight:600;color:var(--text2);display:flex;gap:.5rem;margin-bottom:.3rem">
     <span style="width:80px">Tipo</span><span style="flex:2">Item</span><span style="flex:1">Unidad</span><span style="width:75px">Cantidad</span><span style="width:28px"></span>
@@ -2936,11 +2959,13 @@ function renderEditableRecipeForm() {
     const newName = document.getElementById('editRecipeName')?.value.trim();
     if (!newName) { alert('Nombre requerido'); return; }
     const precio = parseFloat(document.getElementById('editRecipePrice')?.value) || 0;
+    const nuevaNota = document.getElementById('editRecipeNota')?.value.trim() || '';
     const recipe = menuRecipes.find(r => r.id == currentEditingRecipeId);
     if (recipe) {
       recipe.name = newName;
       recipe.components = editingRecipeComponents.filter(c => c.quantity > 0 && c.id);
       recipe.precioVenta = precio;
+      recipe.nota = nuevaNota;
     }
     saveCostosToDB();
     editingRecipeName = newName;
@@ -2989,7 +3014,8 @@ function updateRecipeCostDisplay(marginPercent=50) {
         <span style="font-size:13px;font-weight:800;white-space:nowrap;color:var(--accent)">${marginPercent}%</span>
       </div>
       <div style="font-size:13px;margin-top:.625rem;font-weight:600">Precio sugerido: <span style="color:var(--accent);font-size:15px;font-weight:800">$${Math.round(suggestedPrice).toLocaleString('es-CL')}</span></div>
-    </div>`;
+    </div>
+    ${recipe?.nota ? `<div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(recipe.nota)}</div>` : ''}`;
 }
 
 function nuevaRecetaMenu() {
