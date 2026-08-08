@@ -2063,18 +2063,35 @@ function getPreparationCostPerGram(prepId) {
 // ── MIGRACIÓN DE DATOS EXISTENTES ──────────
 function migrarPreparacionesExistentes() {
   let necesitaMigrar = false;
+  let necesitaEditar = [];
   preparations.forEach(p => {
     if (p.tieneProteina === undefined) {
-      p.tieneProteina = true;    // asumir que tiene proteína
-      p.pesoProteinaCocida = 0;  // el usuario deberá ingresar el valor
+      p.tieneProteina = true;
+      p.pesoProteinaCocida = 0;
+      p.pesoProteinaCruda = 0;
       necesitaMigrar = true;
     }
     if (p.pesoProteinaCocida === undefined) p.pesoProteinaCocida = 0;
+    if (p.pesoProteinaCruda === undefined) {
+      // Caso especial: Carnitas
+      if (p.tieneProteina && p.name && p.name.toLowerCase().includes('carnitas')) {
+        p.pesoProteinaCruda = 10000;
+      } else {
+        p.pesoProteinaCruda = 0;
+        if (p.tieneProteina) necesitaEditar.push(p.name);
+      }
+      necesitaMigrar = true;
+    }
   });
   if (necesitaMigrar) {
     saveCostosToDB();
     setTimeout(() => {
-      alert('⚠️ Tus preparaciones fueron actualizadas.\n\nSe marcaron todas como "con proteína". Edita cada preparación e ingresa el peso cocido y escurrido en gramos.\n\nEjemplo: Carnitas → 6750 gr (peso de la olla después de cocinar).\n\nSi una preparación NO tiene proteína (ej: Guacamole, Arroz), edítala y desmarca la opción.');
+      let msg = '⚠️ Preparaciones actualizadas.\n\nSe agregó el campo "Peso proteína cruda".\n';
+      if (necesitaEditar.length) {
+        msg += `\nEdita manualmente estas preparaciones e ingresa el peso crudo de la proteína (antes de cocinar):\n· ${necesitaEditar.join('\n· ')}`;
+      }
+      msg += '\n\nCarnitas: se asignaron automáticamente 10.000 gr de proteína cruda.';
+      alert(msg);
     }, 600);
   }
 }
@@ -2430,16 +2447,19 @@ function renderPreparaciones() {
     const total = getPreparationCost(prep.id);
     const pesoGrCrudo = getPreparationWeightGrams(prep.id);
     // Usar peso cocido si tiene proteína, de lo contrario peso crudo
-    const tieneProteina = prep.tieneProteina !== false; // default true para compatibilidad
+    const tieneProteina = prep.tieneProteina !== false;
     const pesoProteinaCocida = prep.pesoProteinaCocida || 0;
+    const pesoProteinaCruda  = prep.pesoProteinaCruda  || 0;
     const pesoBase = (tieneProteina && pesoProteinaCocida > 0) ? pesoProteinaCocida : pesoGrCrudo;
     const perGram = pesoBase > 0 ? total / pesoBase : 0;
-    // Merma: pérdida por cocción
-    const merma = (tieneProteina && pesoProteinaCocida > 0 && pesoGrCrudo > 0)
-      ? ((1 - pesoProteinaCocida / pesoGrCrudo) * 100).toFixed(1) + '%'
+    // Merma: solo sobre la proteína, no sobre el peso total
+    const merma = (tieneProteina && pesoProteinaCruda > 0 && pesoProteinaCocida > 0)
+      ? ((pesoProteinaCruda - pesoProteinaCocida) / pesoProteinaCruda * 100).toFixed(1) + '%'
       : null;
-    // Alerta si tiene proteína pero falta ingresar el peso cocido
-    const alertaPesoCocido = tieneProteina && pesoProteinaCocida === 0;
+    const rendimiento = (tieneProteina && pesoProteinaCruda > 0 && pesoProteinaCocida > 0)
+      ? (pesoProteinaCocida / pesoProteinaCruda * 100).toFixed(1) + '%'
+      : null;
+    const alertaPesoCocido = tieneProteina && (pesoProteinaCocida === 0 || pesoProteinaCruda === 0);
     // Desglose por ingrediente
     const desglose = (prep.ingredients||[]).map(i => {
       let sub = 0, peso = 0, label = '';
@@ -2468,6 +2488,7 @@ function renderPreparaciones() {
             <span style="font-size:11px;color:var(--text3)">${Math.round(pesoGrCrudo).toLocaleString('es-CL')} gr crudo</span>
             ${tieneProteina && pesoProteinaCocida > 0 ? `<span style="font-size:11px;color:var(--green)">→ ${Math.round(pesoProteinaCocida).toLocaleString('es-CL')} gr cocido</span>` : ''}
             ${merma ? `<span class="badge badge-yellow">Merma ${merma}</span>` : ''}
+            ${rendimiento ? `<span class="badge badge-green">Rend. ${rendimiento}</span>` : ''}
             ${alertaPesoCocido
               ? `<span class="badge badge-yellow" style="cursor:pointer" onclick="event.stopPropagation();abrirEditorPreparacion('${prep.id}')">⚠ Falta peso cocido</span>`
               : `<span class="badge badge-orange">${perGram>0?'$'+perGram.toFixed(4)+'/gr':'—'}</span>`
@@ -2483,7 +2504,7 @@ function renderPreparaciones() {
       </div>
       <div style="max-height:0;overflow:hidden;transition:max-height .35s ease">
         <div style="padding:0 1rem .5rem">
-          ${alertaPesoCocido ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:.6rem .875rem;margin-bottom:.5rem;font-size:12px;color:#fbbf24">⚠ Esta preparación tiene proteína pero no tiene el peso cocido ingresado. El $/gr mostrado usa el peso crudo y <strong>no es correcto</strong>. Edita la preparación e ingresa el peso final.</div>` : ''}
+          ${alertaPesoCocido ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:.6rem .875rem;margin-bottom:.5rem;font-size:12px;color:#fbbf24">⚠ Falta ingresar el peso crudo y/o cocido de la proteína. El $/gr mostrado puede no ser correcto. Edita la preparación.</div>` : ''}
           <div style="display:flex;background:var(--bg3);padding:.4rem .75rem;border-radius:7px;font-size:10px;font-weight:700;color:var(--text3);margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
             <span style="flex:2">Ingrediente</span><span style="flex:1;text-align:center">Cantidad</span><span style="flex:1;text-align:right">Peso</span><span style="flex:1;text-align:right">Subtotal</span>
           </div>
@@ -2500,9 +2521,18 @@ function renderPreparaciones() {
             <span style="flex:1;text-align:right;color:var(--accent)">$${Math.round(total).toLocaleString('es-CL')}</span>
           </div>
           ${tieneProteina && pesoProteinaCocida > 0 ? `
-          <div style="display:flex;padding:.4rem .75rem;font-size:12px;font-weight:700;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);margin-top:.375rem;border-radius:7px;justify-content:space-between">
-            <span>Costo por gr (cocido)</span>
-            <span style="color:var(--green)">$${perGram.toFixed(4)}/gr · base ${Math.round(pesoProteinaCocida).toLocaleString('es-CL')} gr cocidos</span>
+          <div style="display:flex;flex-direction:column;gap:.25rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);margin-top:.375rem;border-radius:7px;padding:.5rem .75rem">
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700">
+              <span>Costo/gr (base proteína cocida)</span>
+              <span style="color:var(--green)">$${perGram.toFixed(4)}/gr</span>
+            </div>
+            ${pesoProteinaCruda > 0 ? `
+            <div style="display:flex;gap:1rem;font-size:11px;color:var(--text3);flex-wrap:wrap">
+              <span>Cruda: <strong style="color:var(--text2)">${Math.round(pesoProteinaCruda).toLocaleString('es-CL')} gr</strong></span>
+              <span>Cocida: <strong style="color:var(--green)">${Math.round(pesoProteinaCocida).toLocaleString('es-CL')} gr</strong></span>
+              ${merma ? `<span>Merma: <strong style="color:var(--yellow)">${merma}</strong></span>` : ''}
+              ${rendimiento ? `<span>Rendimiento: <strong style="color:var(--green)">${rendimiento}</strong></span>` : ''}
+            </div>` : ''}
           </div>` : `
           <div style="text-align:right;font-size:12px;font-weight:600;color:var(--accent);padding:.5rem .75rem 0">
             $${perGram.toFixed(4)}/gr
@@ -2517,7 +2547,7 @@ function duplicarPreparacion(id) {
   const orig = preparations.find(p=>p.id==id); if(!orig) return;
   let newName=orig.name+' (copia)'; let c=1;
   while(preparations.some(p=>p.name===newName)) newName=orig.name+` (copia ${c++})`;
-  preparations.push({id:genId('p'),name:newName,ingredients:JSON.parse(JSON.stringify(orig.ingredients)),tieneProteina:orig.tieneProteina,pesoProteinaCocida:orig.pesoProteinaCocida||0});
+  preparations.push({id:genId('p'),name:newName,ingredients:JSON.parse(JSON.stringify(orig.ingredients)),tieneProteina:orig.tieneProteina,pesoProteinaCruda:orig.pesoProteinaCruda||0,pesoProteinaCocida:orig.pesoProteinaCocida||0});
   saveCostosToDB(); fullRefresh(); toast(`✓ Duplicada: ${newName}`);
 }
 window.duplicarPreparacion = duplicarPreparacion;
@@ -2539,6 +2569,7 @@ function abrirEditorPreparacion(prepId = null) {
     let ingredients = prep ? JSON.parse(JSON.stringify(prep.ingredients || [])) : [];
     let tieneProteina = prep ? (prep.tieneProteina !== false) : true;
     let pesoProteinaCocida = prep ? (prep.pesoProteinaCocida || 0) : 0;
+    let pesoProteinaCruda = prep ? (prep.pesoProteinaCruda || 0) : 0;
     let notaPrep = prep ? (prep.nota || '') : '';
 
     const modal = document.createElement('div');
@@ -2646,27 +2677,29 @@ function abrirEditorPreparacion(prepId = null) {
             const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
             return s + getLatestPrice(ing.rawMaterialId) * qb;
         }, 0);
-        const pesoGrCrudo = ingredients.filter(i => !i.isOp).reduce((s, ing) => {
+        const pesoGrTotal = ingredients.filter(i => !i.isOp).reduce((s, ing) => {
             const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
             if (!m) return s;
             const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
             return s + getWeightInGrams(m, qb);
         }, 0);
-        // Usar peso cocido si hay proteína
         const pesoCocidoInput = parseFloat(document.getElementById('prep-peso-cocido')?.value) || pesoProteinaCocida;
-        const usarPesoCocido = tieneProteina && pesoCocidoInput > 0;
-        const pesoBase = usarPesoCocido ? pesoCocidoInput : pesoGrCrudo;
-        const perGram = pesoBase > 0 ? total / pesoBase : 0;
-        const merma = (tieneProteina && pesoCocidoInput > 0 && pesoGrCrudo > 0)
-          ? ((1 - pesoCocidoInput / pesoGrCrudo) * 100).toFixed(1)
-          : null;
+        const pesoCrudoInput  = parseFloat(document.getElementById('prep-peso-crudo')?.value)  || pesoProteinaCruda;
+        const usarPesoCocido  = tieneProteina && pesoCocidoInput > 0;
+        const pesoBase = usarPesoCocido ? pesoCocidoInput : pesoGrTotal;
+        const perGram  = pesoBase > 0 ? total / pesoBase : 0;
+        const merma      = (tieneProteina && pesoCrudoInput > 0 && pesoCocidoInput > 0)
+          ? ((pesoCrudoInput - pesoCocidoInput) / pesoCrudoInput * 100).toFixed(1) : null;
+        const rendimiento = merma ? (100 - parseFloat(merma)).toFixed(1) : null;
         const display = document.getElementById('prep-total-display');
         if (display) {
-            display.innerHTML = `Costo tanda: <strong>$${Math.round(total).toLocaleString('es-CL')}</strong> · Peso crudo: ${Math.round(pesoGrCrudo).toLocaleString('es-CL')} gr`
-              + (usarPesoCocido ? ` · Cocido: ${Math.round(pesoCocidoInput).toLocaleString('es-CL')} gr` : '')
-              + (merma ? ` · Merma: <strong style="color:var(--yellow)">${merma}%</strong>` : '')
+            display.innerHTML = `Costo tanda: <strong>$${Math.round(total).toLocaleString('es-CL')}</strong> · Peso total ingredientes: ${Math.round(pesoGrTotal).toLocaleString('es-CL')} gr`
+              + (pesoCrudoInput  > 0 ? ` · Proteína cruda: ${Math.round(pesoCrudoInput).toLocaleString('es-CL')} gr` : '')
+              + (usarPesoCocido  ? ` · Proteína cocida: ${Math.round(pesoCocidoInput).toLocaleString('es-CL')} gr` : '')
+              + (merma           ? ` · Merma: <strong style="color:var(--yellow)">${merma}%</strong> · Rendimiento: <strong style="color:var(--green)">${rendimiento}%</strong>` : '')
               + ` · <strong style="color:var(--accent)">$${perGram.toFixed(4)}/gr</strong>`
-              + (tieneProteina && pesoCocidoInput === 0 ? ' <span style="color:var(--yellow)">⚠ Ingresa el peso cocido</span>' : '');
+              + (tieneProteina && (pesoCocidoInput === 0 || pesoCrudoInput === 0)
+                  ? ' <span style="color:var(--yellow)">⚠ Completa los pesos de proteína</span>' : '');
         }
     };
 
@@ -2682,12 +2715,24 @@ function abrirEditorPreparacion(prepId = null) {
             Esta preparación tiene proteína principal (carne, pollo, etc.)
           </label>
           <div id="prep-peso-cocido-wrap" style="margin-top:.75rem;display:${tieneProteina ? 'block' : 'none'}">
-            <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Peso final cocido y escurrido (gramos)</label>
-            <div style="display:flex;align-items:center;gap:.5rem">
-              <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 6750" min="0" step="1" style="max-width:180px" oninput="document.querySelector && (function(){const updateFn=document.getElementById('prep-total-display')&&window._prepUpdateTotals;if(updateFn)updateFn();})()">
-              <span style="font-size:12px;color:var(--text3)">gr</span>
+            <div class="form-row" style="margin-bottom:.5rem">
+              <div>
+                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Peso proteína CRUDA (gramos)</label>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                  <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" style="max-width:180px" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+                  <span style="font-size:12px;color:var(--text3)">gr</span>
+                </div>
+                <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo el peso de la carne/pollo antes de cocinar.</div>
+              </div>
+              <div>
+                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Peso proteína COCIDA (gramos)</label>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                  <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" style="max-width:180px" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+                  <span style="font-size:12px;color:var(--text3)">gr</span>
+                </div>
+                <div style="font-size:11px;color:var(--text3);margin-top:4px">Peso final cocida y escurrida.</div>
+              </div>
             </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:4px">El peso real después de cocinar y escurrir. Se usa para calcular el $/gr correcto.</div>
           </div>
         </div>
 
@@ -2717,11 +2762,18 @@ function abrirEditorPreparacion(prepId = null) {
                 updateTotals();
             });
         }
-        // Actualizar totales al cambiar peso cocido
+        // Actualizar totales al cambiar pesos de proteína
         const pesoCocidoInput = card.querySelector('#prep-peso-cocido');
         if (pesoCocidoInput) {
             pesoCocidoInput.addEventListener('input', () => {
                 pesoProteinaCocida = parseFloat(pesoCocidoInput.value) || 0;
+                updateTotals();
+            });
+        }
+        const pesoCrudoInput = card.querySelector('#prep-peso-crudo');
+        if (pesoCrudoInput) {
+            pesoCrudoInput.addEventListener('input', () => {
+                pesoProteinaCruda = parseFloat(pesoCrudoInput.value) || 0;
                 updateTotals();
             });
         }
@@ -2752,11 +2804,17 @@ function abrirEditorPreparacion(prepId = null) {
                 // Leer valores actuales de los campos
                 const checkEl = document.getElementById('prep-tiene-proteina');
                 const pesoCocidoEl = document.getElementById('prep-peso-cocido');
+                const pesoCrudoEl  = document.getElementById('prep-peso-crudo');
                 const finalTieneProteina = checkEl ? checkEl.checked : tieneProteina;
                 const finalPesoCocido = pesoCocidoEl ? (parseFloat(pesoCocidoEl.value) || 0) : pesoProteinaCocida;
-                // Validar: si tiene proteína, el peso cocido debe ser > 0
+                const finalPesoCrudo  = pesoCrudoEl  ? (parseFloat(pesoCrudoEl.value)  || 0) : pesoProteinaCruda;
+                if (finalTieneProteina && finalPesoCrudo <= 0) {
+                    toast('⚠ Ingresa el peso CRUDO de la proteína (antes de cocinar)', '#422006', '#fbbf24');
+                    pesoCrudoEl?.focus();
+                    return;
+                }
                 if (finalTieneProteina && finalPesoCocido <= 0) {
-                    toast('⚠ Ingresa el peso cocido y escurrido en gramos', '#422006', '#fbbf24');
+                    toast('⚠ Ingresa el peso COCIDO de la proteína (después de escurrir)', '#422006', '#fbbf24');
                     pesoCocidoEl?.focus();
                     return;
                 }
@@ -2766,6 +2824,7 @@ function abrirEditorPreparacion(prepId = null) {
                     prep.name = newName;
                     prep.ingredients = finalIngs;
                     prep.tieneProteina = finalTieneProteina;
+                    prep.pesoProteinaCruda  = finalTieneProteina ? finalPesoCrudo  : 0;
                     prep.pesoProteinaCocida = finalTieneProteina ? finalPesoCocido : 0;
                     prep.nota = finalNota;
                 } else {
@@ -2774,6 +2833,7 @@ function abrirEditorPreparacion(prepId = null) {
                         name: newName,
                         ingredients: finalIngs,
                         tieneProteina: finalTieneProteina,
+                        pesoProteinaCruda:  finalTieneProteina ? finalPesoCrudo  : 0,
                         pesoProteinaCocida: finalTieneProteina ? finalPesoCocido : 0,
                         nota: finalNota
                     });
