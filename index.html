@@ -2864,16 +2864,17 @@ function abrirEditorPreparacion(prepId = null) {
             });
         }
 
-        renderIngs();
-        updateTotals();
+        // NO llamar renderIngs aquí — el #ings-container aún no está en el DOM
     };
 
     modal.appendChild(card);
     document.body.appendChild(modal);
     refreshUI();
-    // Renderizar ingredientes DESPUÉS de que el DOM esté listo
-    renderIngs();
-    updateTotals();
+    // Renderizar ingredientes después de que refreshUI haya insertado el HTML
+    setTimeout(() => {
+        renderIngs();
+        updateTotals();
+    }, 0);
 }
 window.abrirEditorPreparacion = abrirEditorPreparacion;
 
