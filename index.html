@@ -2503,41 +2503,68 @@ function renderPreparaciones() {
         </div>
       </div>
       <div style="max-height:0;overflow:hidden;transition:max-height .35s ease">
-        <div style="padding:0 1rem .5rem">
-          ${alertaPesoCocido ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:.6rem .875rem;margin-bottom:.5rem;font-size:12px;color:#fbbf24">⚠ Falta ingresar el peso crudo y/o cocido de la proteína. El $/gr mostrado puede no ser correcto. Edita la preparación.</div>` : ''}
-          <div style="display:flex;background:var(--bg3);padding:.4rem .75rem;border-radius:7px;font-size:10px;font-weight:700;color:var(--text3);margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
-            <span style="flex:2">Ingrediente</span><span style="flex:1;text-align:center">Cantidad</span><span style="flex:1;text-align:right">Peso</span><span style="flex:1;text-align:right">Subtotal</span>
+        <div style="padding:0 1rem .875rem">
+          ${alertaPesoCocido ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:13px;color:#fbbf24;line-height:1.5">⚠ Falta ingresar el peso crudo y/o cocido de la proteína. El $/gr puede no ser correcto. Edita la preparación.</div>` : ''}
+
+          <!-- HEADER COLUMNAS -->
+          <div style="display:flex;background:var(--bg3);padding:.5rem 1rem;border-radius:9px;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:.5rem;letter-spacing:.4px;text-transform:uppercase">
+            <span style="flex:2.5">Ingrediente</span>
+            <span style="flex:1.2;text-align:center">Cantidad</span>
+            <span style="flex:1;text-align:right">Peso (gr)</span>
+            <span style="flex:1;text-align:right">Subtotal</span>
           </div>
-          ${desglose.map(d=>`<div style="display:flex;padding:.3rem .75rem;font-size:12px;border-bottom:1px solid var(--border)">
-            <span style="flex:2;color:var(--text)">${d.label}</span>
-            <span style="flex:1;text-align:center;color:var(--text3)">${d.cantidad}</span>
-            <span style="flex:1;text-align:right;color:var(--text3)">${d.peso>0?Math.round(d.peso).toLocaleString('es-CL'):'—'}</span>
-            <span style="flex:1;text-align:right;color:${d.sub>0?'var(--accent)':'var(--text3)'};font-weight:${d.sub>0?'600':'400'}">${d.sub>0?'$'+Math.round(d.sub).toLocaleString('es-CL'):'—'}</span>
+
+          <!-- FILAS DE INGREDIENTES -->
+          ${desglose.map(d=>`<div style="display:flex;align-items:center;padding:.6rem 1rem;font-size:14px;border-bottom:1px solid var(--border)">
+            <span style="flex:2.5;color:var(--text);font-weight:500">${d.label}</span>
+            <span style="flex:1.2;text-align:center;color:var(--text2);font-family:var(--font-mono)">${d.cantidad}</span>
+            <span style="flex:1;text-align:right;color:var(--text3);font-family:var(--font-mono)">${d.peso>0?Math.round(d.peso).toLocaleString('es-CL'):'—'}</span>
+            <span style="flex:1;text-align:right;color:${d.sub>0?'var(--accent)':'var(--text3)'};font-weight:${d.sub>0?'700':'400'};font-family:var(--font-mono)">${d.sub>0?'$'+Math.round(d.sub).toLocaleString('es-CL'):'—'}</span>
           </div>`).join('')}
-          <div style="display:flex;padding:.4rem .75rem;font-size:12px;font-weight:700;background:var(--bg3);margin-top:.375rem;border-radius:7px">
-            <span style="flex:2;letter-spacing:.02em">TOTAL TANDA</span>
-            <span style="flex:1"></span>
-            <span style="flex:1;text-align:right;color:var(--text2)">${Math.round(pesoGrCrudo).toLocaleString('es-CL')} gr</span>
-            <span style="flex:1;text-align:right;color:var(--accent)">$${Math.round(total).toLocaleString('es-CL')}</span>
+
+          <!-- TOTAL TANDA -->
+          <div style="display:flex;align-items:center;padding:.7rem 1rem;font-size:14px;font-weight:700;background:var(--bg3);margin-top:.5rem;border-radius:9px">
+            <span style="flex:2.5;letter-spacing:.02em;color:var(--text2)">TOTAL TANDA</span>
+            <span style="flex:1.2"></span>
+            <span style="flex:1;text-align:right;color:var(--text2);font-family:var(--font-mono)">${Math.round(pesoGrCrudo).toLocaleString('es-CL')}</span>
+            <span style="flex:1;text-align:right;color:var(--accent);font-size:16px;font-family:var(--font-mono)">$${Math.round(total).toLocaleString('es-CL')}</span>
           </div>
+
+          <!-- BLOQUE PROTEÍNA -->
           ${tieneProteina && pesoProteinaCocida > 0 ? `
-          <div style="display:flex;flex-direction:column;gap:.25rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);margin-top:.375rem;border-radius:7px;padding:.5rem .75rem">
-            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700">
-              <span>Costo/gr (base proteína cocida)</span>
-              <span style="color:var(--green)">$${perGram.toFixed(4)}/gr</span>
+          <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.18);margin-top:.625rem;border-radius:10px;padding:.875rem 1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+              <span style="font-size:13px;font-weight:700;color:var(--text)">Costo por gramo (proteína cocida)</span>
+              <span style="font-size:18px;font-weight:800;color:var(--green);font-family:var(--font-mono)">$${perGram.toFixed(4)}<span style="font-size:12px;font-weight:500;color:var(--text3)">/gr</span></span>
             </div>
             ${pesoProteinaCruda > 0 ? `
-            <div style="display:flex;gap:1rem;font-size:11px;color:var(--text3);flex-wrap:wrap">
-              <span>Cruda: <strong style="color:var(--text2)">${Math.round(pesoProteinaCruda).toLocaleString('es-CL')} gr</strong></span>
-              <span>Cocida: <strong style="color:var(--green)">${Math.round(pesoProteinaCocida).toLocaleString('es-CL')} gr</strong></span>
-              ${merma ? `<span>Merma: <strong style="color:var(--yellow)">${merma}</strong></span>` : ''}
-              ${rendimiento ? `<span>Rendimiento: <strong style="color:var(--green)">${rendimiento}</strong></span>` : ''}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+              <div style="background:var(--bg3);border-radius:8px;padding:.625rem .875rem">
+                <div style="font-size:10.5px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Proteína cruda</div>
+                <div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--font-mono)">${Math.round(pesoProteinaCruda).toLocaleString('es-CL')} <span style="font-size:12px;color:var(--text3);font-weight:500">gr</span></div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:.625rem .875rem">
+                <div style="font-size:10.5px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Proteína cocida</div>
+                <div style="font-size:18px;font-weight:800;color:var(--green);font-family:var(--font-mono)">${Math.round(pesoProteinaCocida).toLocaleString('es-CL')} <span style="font-size:12px;color:var(--text3);font-weight:500">gr</span></div>
+              </div>
+              ${merma ? `
+              <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.15);border-radius:8px;padding:.625rem .875rem">
+                <div style="font-size:10.5px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Merma</div>
+                <div style="font-size:22px;font-weight:800;color:#fbbf24;font-family:var(--font-mono)">${merma}</div>
+              </div>` : ''}
+              ${rendimiento ? `
+              <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);border-radius:8px;padding:.625rem .875rem">
+                <div style="font-size:10.5px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Rendimiento</div>
+                <div style="font-size:22px;font-weight:800;color:var(--green);font-family:var(--font-mono)">${rendimiento}</div>
+              </div>` : ''}
             </div>` : ''}
           </div>` : `
-          <div style="text-align:right;font-size:12px;font-weight:600;color:var(--accent);padding:.5rem .75rem 0">
+          <div style="text-align:right;font-size:15px;font-weight:700;color:var(--accent);padding:.625rem 1rem 0;font-family:var(--font-mono)">
             $${perGram.toFixed(4)}/gr
           </div>`}
-          ${prep.nota ? `<div style="margin-top:.625rem;padding:.5rem .75rem;background:rgba(255,255,255,.04);border-radius:7px;border-left:2px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(prep.nota)}</div>` : ''}
+
+          <!-- NOTA -->
+          ${prep.nota ? `<div style="margin-top:.625rem;padding:.625rem .875rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(255,255,255,.1);font-size:12.5px;color:var(--text3);line-height:1.6">📝 ${escapeHtml(prep.nota)}</div>` : ''}
         </div>
       </div>
     </div>`;
@@ -2573,10 +2600,14 @@ function abrirEditorPreparacion(prepId = null) {
     let notaPrep = prep ? (prep.nota || '') : '';
 
     const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:0';
     const card = document.createElement('div');
     card.className = 'modal';
-    card.style.cssText = 'position:relative;max-width:560px;width:95%;max-height:85vh;overflow-y:auto';
+    const isMobile = window.innerWidth < 640;
+    modal.style.alignItems = isMobile ? 'flex-end' : 'center';
+    card.style.cssText = isMobile
+      ? 'position:relative;width:100%;max-width:100%;height:96dvh;max-height:96dvh;overflow-y:auto;border-radius:20px 20px 0 0;padding:1.25rem 1rem'
+      : 'position:relative;width:98%;max-width:1100px;height:auto;max-height:92dvh;overflow-y:auto;border-radius:var(--r-xl);padding:1.75rem 2rem';
 
     const gasHr = Math.round(getCostoHoraGas());
     const moHr = parseFloat(document.getElementById('op-mo-hora')?.value) || 4500;
@@ -2584,173 +2615,161 @@ function abrirEditorPreparacion(prepId = null) {
     const renderIngs = () => {
         const container = document.getElementById('ings-container');
         if (!container) return;
-
         container.innerHTML = ingredients.map((ing, idx) => {
-            const mat = rawMaterials.find(m => m.id == ing.rawMaterialId);
-            const units = mat ? [mat.unit, ...(mat.customUnits?.map(u => u.name) || []), '🔥 Gas (hr)', '👷 MO (hr)'] : ['🔥 Gas (hr)', '👷 MO (hr)'];
-            let subtotal = 0;
-            if (ing.isOp === 'gas') subtotal = ing.quantity * gasHr;
-            else if (ing.isOp === 'mo') subtotal = ing.quantity * moHr;
-            else if (mat) {
-                const qtyBase = convertToBaseUnit(mat, ing.quantity, ing.unit || mat.unit);
-                subtotal = getLatestPrice(ing.rawMaterialId) * qtyBase;
+            if (ing.isOp === 'gas' || ing.isOp === 'mo') {
+                const label = ing.isOp === 'gas' ? 'Gas/Cocción' : 'Mano de Obra';
+                const rate = ing.isOp === 'gas' ? gasHr : moHr;
+                const sub = Math.round(ing.quantity * rate);
+                return `<div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;padding:.5rem .875rem;background:var(--bg3);border-radius:9px">
+                  <span style="flex:1;font-size:13px;color:var(--text2)">${label} ($${rate.toLocaleString('es-CL')}/hr)</span>
+                  <input type="number" step="0.5" min="0" value="${ing.quantity}"
+                    style="width:90px;text-align:right;font-size:14px;padding:7px 10px"
+                    oninput="window._prepIngChange(${idx},'qty',this.value)">
+                  <span style="font-size:12px;color:var(--accent);font-weight:600;width:72px;text-align:right;font-family:var(--font-mono)">${sub > 0 ? '$'+sub.toLocaleString('es-CL') : '—'}</span>
+                  <button onclick="window._prepIngDel(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
+                </div>`;
             }
-
-            return `
-            <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.3rem">
-                <select style="flex:3;font-size:12px;padding:4px" data-idx="${idx}" data-action="mat">
-                    <option value="__gas__" ${ing.isOp === 'gas' ? 'selected' : ''}>🔥 Gas/Cocción ($${gasHr.toLocaleString('es-CL')}/hr)</option>
-                    <option value="__mo__" ${ing.isOp === 'mo' ? 'selected' : ''}>👷 Mano de Obra ($${moHr.toLocaleString('es-CL')}/hr)</option>
-                    ${rawMaterials.map(m => `<option value="${m.id}" ${m.id == ing.rawMaterialId && !ing.isOp ? 'selected' : ''}>${escapeHtml(m.name)} (${m.unit})</option>`).join('')}
-                </select>
-                ${ing.isOp ? `<span style="flex:1;font-size:11px;color:var(--text2)">hrs</span>` : `
-                <select style="flex:1;font-size:12px;padding:4px" data-idx="${idx}" data-action="unit">
-                    ${units.map(u => `<option value="${u}" ${ing.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
-                </select>`}
-                <input type="number" step="any" style="flex:1;font-size:12px;padding:4px;text-align:right" value="${ing.quantity || 0}" data-idx="${idx}" data-action="qty">
-                <span style="flex:1;font-size:11px;color:var(--accent);text-align:right">${subtotal > 0 ? '$' + Math.round(subtotal).toLocaleString('es-CL') : '—'}</span>
-                <button class="btn btn-danger btn-sm" style="padding:3px 6px" data-idx="${idx}" data-action="del">✕</button>
+            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
+            const units = m ? [m.unit, ...(m.customUnits?.map(u => u.name) || [])].filter(Boolean) : [];
+            const cost = m ? (() => {
+                const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
+                return Math.round(getLatestPrice(ing.rawMaterialId) * qb);
+            })() : 0;
+            return `<div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;padding:.5rem .875rem;background:var(--bg3);border-radius:9px">
+              <select onchange="window._prepIngChange(${idx},'id',this.value)"
+                style="flex:2;min-width:0;font-size:13px;padding:7px 10px">
+                <option value="__gas__" ${ing.isOp==='gas'?'selected':''}>🔥 Gas/Cocción</option>
+                <option value="__mo__" ${ing.isOp==='mo'?'selected':''}>👷 Mano de Obra</option>
+                ${rawMaterials.map(r => `<option value="${r.id}" ${r.id==ing.rawMaterialId&&!ing.isOp?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}
+              </select>
+              <select onchange="window._prepIngChange(${idx},'unit',this.value)"
+                style="width:90px;flex-shrink:0;font-size:13px;padding:7px 8px;display:${ing.isOp?'none':'block'}">
+                ${units.map(u => `<option value="${u}" ${u===ing.unit?'selected':''}>${u}</option>`).join('')}
+              </select>
+              <input type="number" step="any" min="0" value="${ing.quantity}"
+                oninput="window._prepIngChange(${idx},'qty',this.value)"
+                style="width:80px;flex-shrink:0;text-align:right;font-size:14px;padding:7px 8px">
+              <span style="font-size:12px;color:var(--accent);font-weight:600;width:72px;flex-shrink:0;text-align:right;font-family:var(--font-mono)">${cost > 0 ? '$'+cost.toLocaleString('es-CL') : '—'}</span>
+              <button onclick="window._prepIngDel(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
             </div>`;
         }).join('');
-
-        container.querySelectorAll('select[data-action="mat"]').forEach(sel => {
-            sel.addEventListener('change', () => {
-                const idx = parseInt(sel.dataset.idx);
-                const val = sel.value;
+        // Global handlers
+        window._prepIngChange = (idx, field, val) => {
+            if (field === 'id') {
                 if (val === '__gas__') ingredients[idx] = { isOp: 'gas', quantity: ingredients[idx]?.quantity || 1 };
                 else if (val === '__mo__') ingredients[idx] = { isOp: 'mo', quantity: ingredients[idx]?.quantity || 1 };
-                else {
-                    const m = rawMaterials.find(x => x.id == val);
-                    ingredients[idx] = { rawMaterialId: val, unit: m?.unit || 'kg', quantity: ingredients[idx]?.quantity || 0 };
-                }
+                else { const m = rawMaterials.find(x=>x.id==val); ingredients[idx] = { rawMaterialId: val, unit: m?.unit||'kg', quantity: ingredients[idx]?.quantity||0 }; }
                 renderIngs();
-                updateTotals();
-            });
-        });
-        container.querySelectorAll('select[data-action="unit"]').forEach(sel => {
-            sel.addEventListener('change', () => {
-                const idx = parseInt(sel.dataset.idx);
-                ingredients[idx].unit = sel.value;
-                renderIngs();
-                updateTotals();
-            });
-        });
-        container.querySelectorAll('input[data-action="qty"]').forEach(inp => {
-            inp.addEventListener('input', () => {
-                const idx = parseInt(inp.dataset.idx);
-                ingredients[idx].quantity = parseFloat(inp.value) || 0;
-                updateTotals();
-                const row = inp.closest('div');
-                const subtotalSpan = row.querySelector('span:last-of-type');
-                if (subtotalSpan) {
-                    const ing = ingredients[idx];
-                    let sub = 0;
-                    if (ing.isOp === 'gas') sub = ing.quantity * gasHr;
-                    else if (ing.isOp === 'mo') sub = ing.quantity * moHr;
-                    else {
-                        const mat = rawMaterials.find(m => m.id == ing.rawMaterialId);
-                        if (mat) {
-                            const qtyBase = convertToBaseUnit(mat, ing.quantity, ing.unit || mat.unit);
-                            sub = getLatestPrice(ing.rawMaterialId) * qtyBase;
-                        }
-                    }
-                    subtotalSpan.textContent = sub > 0 ? '$' + Math.round(sub).toLocaleString('es-CL') : '—';
-                }
-            });
-        });
-        container.querySelectorAll('button[data-action="del"]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.idx);
-                ingredients.splice(idx, 1);
-                renderIngs();
-                updateTotals();
-            });
-        });
-    };
-
-    const updateTotals = () => {
-        const total = ingredients.reduce((s, ing) => {
-            if (ing.isOp === 'gas') return s + ing.quantity * gasHr;
-            if (ing.isOp === 'mo') return s + ing.quantity * moHr;
-            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
-            if (!m) return s;
-            const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
-            return s + getLatestPrice(ing.rawMaterialId) * qb;
-        }, 0);
-        const pesoGrTotal = ingredients.filter(i => !i.isOp).reduce((s, ing) => {
-            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
-            if (!m) return s;
-            const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
-            return s + getWeightInGrams(m, qb);
-        }, 0);
-        const pesoCocidoInput = parseFloat(document.getElementById('prep-peso-cocido')?.value) || pesoProteinaCocida;
-        const pesoCrudoInput  = parseFloat(document.getElementById('prep-peso-crudo')?.value)  || pesoProteinaCruda;
-        const usarPesoCocido  = tieneProteina && pesoCocidoInput > 0;
-        const pesoBase = usarPesoCocido ? pesoCocidoInput : pesoGrTotal;
-        const perGram  = pesoBase > 0 ? total / pesoBase : 0;
-        const merma      = (tieneProteina && pesoCrudoInput > 0 && pesoCocidoInput > 0)
-          ? ((pesoCrudoInput - pesoCocidoInput) / pesoCrudoInput * 100).toFixed(1) : null;
-        const rendimiento = merma ? (100 - parseFloat(merma)).toFixed(1) : null;
-        const display = document.getElementById('prep-total-display');
-        if (display) {
-            display.innerHTML = `Costo tanda: <strong>$${Math.round(total).toLocaleString('es-CL')}</strong> · Peso total ingredientes: ${Math.round(pesoGrTotal).toLocaleString('es-CL')} gr`
-              + (pesoCrudoInput  > 0 ? ` · Proteína cruda: ${Math.round(pesoCrudoInput).toLocaleString('es-CL')} gr` : '')
-              + (usarPesoCocido  ? ` · Proteína cocida: ${Math.round(pesoCocidoInput).toLocaleString('es-CL')} gr` : '')
-              + (merma           ? ` · Merma: <strong style="color:var(--yellow)">${merma}%</strong> · Rendimiento: <strong style="color:var(--green)">${rendimiento}%</strong>` : '')
-              + ` · <strong style="color:var(--accent)">$${perGram.toFixed(4)}/gr</strong>`
-              + (tieneProteina && (pesoCocidoInput === 0 || pesoCrudoInput === 0)
-                  ? ' <span style="color:var(--yellow)">⚠ Completa los pesos de proteína</span>' : '');
-        }
+            } else if (field === 'unit') {
+                ingredients[idx].unit = val;
+            } else if (field === 'qty') {
+                ingredients[idx].quantity = parseFloat(val) || 0;
+            }
+            updateTotals();
+        };
+        window._prepIngDel = (idx) => { ingredients.splice(idx, 1); renderIngs(); updateTotals(); };
     };
 
     const refreshUI = () => {
         card.innerHTML = `
         <div class="modal-header"><h2>${isEdit ? '✏ Editar preparación' : 'Nueva preparación'}</h2><button class="close-btn" onclick="this.closest('[style*=fixed]').remove()">✕</button></div>
+
+        ${!isMobile ? `
+        <!-- LAYOUT 2 COLUMNAS ESCRITORIO -->
+        <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:.5rem">
+
+          <!-- COLUMNA IZQUIERDA -->
+          <div style="display:flex;flex-direction:column;gap:.875rem">
+            <div>
+              <label>Nombre</label>
+              <input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
+            </div>
+
+            <!-- PROTEÍNA -->
+            <div style="background:var(--bg3);border-radius:10px;padding:1rem;border:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:600;letter-spacing:0">
+                <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+                Tiene proteína principal
+              </label>
+              <div id="prep-peso-cocido-wrap" style="margin-top:.875rem;display:${tieneProteina ? 'block' : 'none'}">
+                <div>
+                  <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cruda (gr)</label>
+                  <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+                  <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo la carne/pollo antes de cocinar.</div>
+                </div>
+                <div style="margin-top:.75rem">
+                  <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cocida (gr)</label>
+                  <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+                  <div style="font-size:11px;color:var(--text3);margin-top:4px">Peso final cocida y escurrida.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- NOTA -->
+            <div>
+              <label>📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+              <textarea id="prep-nota" rows="4" placeholder="ej: Merma calculada sobre 10kg tapapecho. Actualizar si cambia la proteína." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(notaPrep)}</textarea>
+            </div>
+
+            <!-- TOTALES -->
+            <div id="prep-total-display" style="font-size:12px;font-weight:600;color:var(--text2);line-height:1.7;background:var(--bg3);border-radius:9px;padding:.75rem 1rem;border:1px solid var(--border)"></div>
+
+            <!-- BOTONES -->
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:auto">
+              <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+              <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
+            </div>
+          </div>
+
+          <!-- COLUMNA DERECHA: INGREDIENTES -->
+          <div style="display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">
+              <label style="margin:0;font-size:13px;font-weight:700">Ingredientes de la tanda</label>
+              <button class="btn btn-primary btn-sm" id="addIngBtn">+ Agregar</button>
+            </div>
+            <div style="background:var(--bg3);border-radius:7px;padding:.4rem .875rem;font-size:10px;font-weight:700;color:var(--text3);display:flex;gap:.5rem;margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
+              <span style="flex:2.5">Materia prima</span><span style="flex:1;text-align:center">Unidad</span><span style="width:80px;text-align:right">Cantidad</span><span style="width:72px;text-align:right">Subtotal</span><span style="width:24px"></span>
+            </div>
+            <div id="ings-container" style="flex:1;overflow-y:auto;max-height:460px"></div>
+          </div>
+        </div>
+
+        ` : `
+        <!-- LAYOUT MÓVIL (1 columna) -->
         <label>Nombre</label><input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
 
-        <!-- SECCIÓN PROTEÍNA -->
         <div style="background:var(--bg3);border-radius:10px;padding:.875rem;margin-top:1rem;border:1px solid var(--border)">
           <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:600;letter-spacing:0">
             <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
-            Esta preparación tiene proteína principal (carne, pollo, etc.)
+            Tiene proteína principal
           </label>
           <div id="prep-peso-cocido-wrap" style="margin-top:.75rem;display:${tieneProteina ? 'block' : 'none'}">
             <div class="form-row" style="margin-bottom:.5rem">
               <div>
-                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Peso proteína CRUDA (gramos)</label>
-                <div style="display:flex;align-items:center;gap:.5rem">
-                  <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" style="max-width:180px" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-                  <span style="font-size:12px;color:var(--text3)">gr</span>
-                </div>
-                <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo el peso de la carne/pollo antes de cocinar.</div>
+                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cruda (gr)</label>
+                <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
               </div>
               <div>
-                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Peso proteína COCIDA (gramos)</label>
-                <div style="display:flex;align-items:center;gap:.5rem">
-                  <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" style="max-width:180px" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-                  <span style="font-size:12px;color:var(--text3)">gr</span>
-                </div>
-                <div style="font-size:11px;color:var(--text3);margin-top:4px">Peso final cocida y escurrida.</div>
+                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cocida (gr)</label>
+                <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
               </div>
             </div>
           </div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin:.875rem 0 .4rem">
-            <label style="margin:0">Ingredientes de la tanda</label>
-            <button class="btn btn-ghost btn-sm" id="addIngBtn">+ Agregar ingrediente</button>
-        </div>
-        <div style="background:var(--bg3);border-radius:6px;padding:.3rem .5rem;font-size:10px;font-weight:600;color:var(--text2);display:flex;gap:.5rem;margin-bottom:.3rem">
-            <span style="flex:3">Materia prima</span><span style="flex:1">Unidad</span><span style="flex:1;text-align:right">Cantidad</span><span style="flex:1;text-align:right">Subtotal</span><span style="width:28px"></span>
+          <label style="margin:0">Ingredientes de la tanda</label>
+          <button class="btn btn-ghost btn-sm" id="addIngBtn">+ Agregar</button>
         </div>
         <div id="ings-container" style="max-height:260px;overflow-y:auto"></div>
         <div id="prep-total-display" style="margin-top:.5rem;font-size:12px;font-weight:600;color:var(--text2);text-align:right;line-height:1.6"></div>
         <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
-        <textarea id="prep-nota" rows="2" placeholder="ej: Merma calculada sobre 10kg tapapecho, peso cocido 6.75kg. Actualizar si cambia la proteína." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5;transition:border-color .15s,box-shadow .15s">${escapeHtml(notaPrep)}</textarea>
+        <textarea id="prep-nota" rows="2" placeholder="ej: Merma calculada sobre 10kg tapapecho." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(notaPrep)}</textarea>
         <div style="display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end">
-            <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
-            <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
-        </div>`;
+          <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+          <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
+        </div>
+        `}`;
 
         // Checkbox proteína — mostrar/ocultar campo de peso cocido
         const checkProteina = card.querySelector('#prep-tiene-proteina');
