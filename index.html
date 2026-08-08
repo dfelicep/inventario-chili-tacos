@@ -2586,31 +2586,88 @@ function eliminarPreparacion(id) {
 }
 window.eliminarPreparacion = eliminarPreparacion;
 
-// ── EDITOR DE PREPARACIONES (CORREGIDO) ─────
+// ── EDITOR DE PREPARACIONES ─────────────────
 function abrirEditorPreparacion(prepId = null) {
     if (!rawMaterials.length) loadCostosFromDB();
 
     const isEdit = prepId !== null;
     let prep = isEdit ? preparations.find(p => p.id == prepId) : null;
-    let name = prep ? prep.name : '';
-    let ingredients = prep ? JSON.parse(JSON.stringify(prep.ingredients || [])) : [];
-    let tieneProteina = prep ? (prep.tieneProteina !== false) : true;
-    let pesoProteinaCocida = prep ? (prep.pesoProteinaCocida || 0) : 0;
-    let pesoProteinaCruda = prep ? (prep.pesoProteinaCruda || 0) : 0;
-    let notaPrep = prep ? (prep.nota || '') : '';
-
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:0';
-    const card = document.createElement('div');
-    card.className = 'modal';
     const isMobile = window.innerWidth < 640;
-    modal.style.alignItems = isMobile ? 'flex-end' : 'center';
-    card.style.cssText = isMobile
-      ? 'position:relative;width:100%;max-width:100%;height:96dvh;max-height:96dvh;overflow-y:auto;border-radius:20px 20px 0 0;padding:1.25rem 1rem'
-      : 'position:relative;width:98%;max-width:1100px;height:auto;max-height:92dvh;overflow-y:auto;border-radius:var(--r-xl);padding:1.75rem 2rem';
+
+    // Estado local
+    let name              = prep ? prep.name : '';
+    let ingredients       = prep ? JSON.parse(JSON.stringify(prep.ingredients || [])) : [];
+    let tieneProteina     = prep ? (prep.tieneProteina !== false) : true;
+    let pesoProteinaCocida = prep ? (prep.pesoProteinaCocida || 0) : 0;
+    let pesoProteinaCruda  = prep ? (prep.pesoProteinaCruda  || 0) : 0;
+    let notaPrep          = prep ? (prep.nota || '') : '';
 
     const gasHr = Math.round(getCostoHoraGas());
-    const moHr = parseFloat(document.getElementById('op-mo-hora')?.value) || 4500;
+    const moHr  = parseFloat(document.getElementById('op-mo-hora')?.value) || 4500;
+
+    // Exponer handlers globales (reemplazados en cada apertura)
+    window._prepAddIng = () => {
+        if (rawMaterials.length) {
+            ingredients.push({ rawMaterialId: rawMaterials[0].id, unit: rawMaterials[0].unit, quantity: 0 });
+        } else {
+            ingredients.push({ isOp: 'gas', quantity: 1 });
+        }
+        renderIngs();
+        updateTotals();
+    };
+    window._prepDelIng = (idx) => {
+        ingredients.splice(idx, 1);
+        renderIngs();
+        updateTotals();
+    };
+    window._prepChangeIng = (idx, field, val) => {
+        if (field === 'id') {
+            if (val === '__gas__') ingredients[idx] = { isOp: 'gas', quantity: ingredients[idx]?.quantity || 1 };
+            else if (val === '__mo__') ingredients[idx] = { isOp: 'mo', quantity: ingredients[idx]?.quantity || 1 };
+            else { const m = rawMaterials.find(x => x.id == val); ingredients[idx] = { rawMaterialId: val, unit: m?.unit || 'kg', quantity: ingredients[idx]?.quantity || 0 }; }
+            renderIngs();
+        } else if (field === 'unit') {
+            ingredients[idx].unit = val;
+        } else if (field === 'qty') {
+            ingredients[idx].quantity = parseFloat(val) || 0;
+        }
+        updateTotals();
+    };
+    window._prepSave = () => {
+        const newName = document.getElementById('prep-modal-nombre')?.value.trim();
+        if (!newName) { toast('Ingresa un nombre', '#450a0a', '#fca5a5'); return; }
+        const checkEl    = document.getElementById('prep-tiene-proteina');
+        const crudoEl    = document.getElementById('prep-peso-crudo');
+        const cocidoEl   = document.getElementById('prep-peso-cocido');
+        const finalTiene = checkEl  ? checkEl.checked : tieneProteina;
+        const finalCrudo  = crudoEl  ? (parseFloat(crudoEl.value)  || 0) : pesoProteinaCruda;
+        const finalCocido = cocidoEl ? (parseFloat(cocidoEl.value) || 0) : pesoProteinaCocida;
+        if (finalTiene && finalCrudo  <= 0) { toast('⚠ Ingresa el peso CRUDO de la proteína',  '#422006','#fbbf24'); crudoEl?.focus();  return; }
+        if (finalTiene && finalCocido <= 0) { toast('⚠ Ingresa el peso COCIDO de la proteína', '#422006','#fbbf24'); cocidoEl?.focus(); return; }
+        const finalIngs = ingredients.filter(i => (i.isOp && i.quantity > 0) || (i.rawMaterialId && i.quantity > 0));
+        const finalNota = document.getElementById('prep-nota')?.value.trim() || '';
+        if (isEdit) {
+            prep.name = newName; prep.ingredients = finalIngs;
+            prep.tieneProteina = finalTiene;
+            prep.pesoProteinaCruda  = finalTiene ? finalCrudo  : 0;
+            prep.pesoProteinaCocida = finalTiene ? finalCocido : 0;
+            prep.nota = finalNota;
+        } else {
+            preparations.push({ id: genId('p'), name: newName, ingredients: finalIngs,
+                tieneProteina: finalTiene,
+                pesoProteinaCruda:  finalTiene ? finalCrudo  : 0,
+                pesoProteinaCocida: finalTiene ? finalCocido : 0,
+                nota: finalNota });
+        }
+        document.getElementById('_prep_modal_wrap')?.remove();
+        saveCostosToDB(); fullRefresh(); toast(`✓ ${newName} guardada`);
+    };
+    window._prepToggleProteina = (checked) => {
+        tieneProteina = checked;
+        const wrap = document.getElementById('prep-peso-cocido-wrap');
+        if (wrap) wrap.style.display = checked ? 'block' : 'none';
+        updateTotals();
+    };
 
     const renderIngs = () => {
         const container = document.getElementById('ings-container');
@@ -2618,263 +2675,166 @@ function abrirEditorPreparacion(prepId = null) {
         container.innerHTML = ingredients.map((ing, idx) => {
             if (ing.isOp === 'gas' || ing.isOp === 'mo') {
                 const label = ing.isOp === 'gas' ? 'Gas/Cocción' : 'Mano de Obra';
-                const rate = ing.isOp === 'gas' ? gasHr : moHr;
-                const sub = Math.round(ing.quantity * rate);
+                const rate  = ing.isOp === 'gas' ? gasHr : moHr;
+                const sub   = Math.round(ing.quantity * rate);
                 return `<div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;padding:.5rem .875rem;background:var(--bg3);border-radius:9px">
                   <span style="flex:1;font-size:13px;color:var(--text2)">${label} ($${rate.toLocaleString('es-CL')}/hr)</span>
                   <input type="number" step="0.5" min="0" value="${ing.quantity}"
                     style="width:90px;text-align:right;font-size:14px;padding:7px 10px"
-                    oninput="window._prepIngChange(${idx},'qty',this.value)">
+                    oninput="window._prepChangeIng(${idx},'qty',this.value)">
                   <span style="font-size:12px;color:var(--accent);font-weight:600;width:72px;text-align:right;font-family:var(--font-mono)">${sub > 0 ? '$'+sub.toLocaleString('es-CL') : '—'}</span>
-                  <button onclick="window._prepIngDel(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
+                  <button onclick="window._prepDelIng(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
                 </div>`;
             }
-            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
+            const m     = rawMaterials.find(x => x.id == ing.rawMaterialId);
             const units = m ? [m.unit, ...(m.customUnits?.map(u => u.name) || [])].filter(Boolean) : [];
-            const cost = m ? (() => {
-                const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
-                return Math.round(getLatestPrice(ing.rawMaterialId) * qb);
-            })() : 0;
+            const cost  = m ? (() => { const qb = convertToBaseUnit(m, ing.quantity, ing.unit||m.unit); return Math.round(getLatestPrice(ing.rawMaterialId)*qb); })() : 0;
             return `<div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;padding:.5rem .875rem;background:var(--bg3);border-radius:9px">
-              <select onchange="window._prepIngChange(${idx},'id',this.value)"
-                style="flex:2;min-width:0;font-size:13px;padding:7px 10px">
+              <select onchange="window._prepChangeIng(${idx},'id',this.value)" style="flex:2;min-width:0;font-size:13px;padding:7px 10px">
                 <option value="__gas__" ${ing.isOp==='gas'?'selected':''}>🔥 Gas/Cocción</option>
-                <option value="__mo__" ${ing.isOp==='mo'?'selected':''}>👷 Mano de Obra</option>
-                ${rawMaterials.map(r => `<option value="${r.id}" ${r.id==ing.rawMaterialId&&!ing.isOp?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}
+                <option value="__mo__"  ${ing.isOp==='mo' ?'selected':''}>👷 Mano de Obra</option>
+                ${rawMaterials.map(r=>`<option value="${r.id}" ${r.id==ing.rawMaterialId&&!ing.isOp?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}
               </select>
-              <select onchange="window._prepIngChange(${idx},'unit',this.value)"
-                style="width:90px;flex-shrink:0;font-size:13px;padding:7px 8px;display:${ing.isOp?'none':'block'}">
-                ${units.map(u => `<option value="${u}" ${u===ing.unit?'selected':''}>${u}</option>`).join('')}
+              <select onchange="window._prepChangeIng(${idx},'unit',this.value)" style="width:90px;flex-shrink:0;font-size:13px;padding:7px 8px;display:${ing.isOp?'none':'block'}">
+                ${units.map(u=>`<option value="${u}" ${u===ing.unit?'selected':''}>${u}</option>`).join('')}
               </select>
               <input type="number" step="any" min="0" value="${ing.quantity}"
-                oninput="window._prepIngChange(${idx},'qty',this.value)"
+                oninput="window._prepChangeIng(${idx},'qty',this.value)"
                 style="width:80px;flex-shrink:0;text-align:right;font-size:14px;padding:7px 8px">
-              <span style="font-size:12px;color:var(--accent);font-weight:600;width:72px;flex-shrink:0;text-align:right;font-family:var(--font-mono)">${cost > 0 ? '$'+cost.toLocaleString('es-CL') : '—'}</span>
-              <button onclick="window._prepIngDel(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
+              <span style="font-size:12px;color:var(--accent);font-weight:600;width:72px;flex-shrink:0;text-align:right;font-family:var(--font-mono)">${cost>0?'$'+cost.toLocaleString('es-CL'):'—'}</span>
+              <button onclick="window._prepDelIng(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;flex-shrink:0">✕</button>
             </div>`;
-        }).join('');
-        // Global handlers
-        window._prepIngChange = (idx, field, val) => {
-            if (field === 'id') {
-                if (val === '__gas__') ingredients[idx] = { isOp: 'gas', quantity: ingredients[idx]?.quantity || 1 };
-                else if (val === '__mo__') ingredients[idx] = { isOp: 'mo', quantity: ingredients[idx]?.quantity || 1 };
-                else { const m = rawMaterials.find(x=>x.id==val); ingredients[idx] = { rawMaterialId: val, unit: m?.unit||'kg', quantity: ingredients[idx]?.quantity||0 }; }
-                renderIngs();
-            } else if (field === 'unit') {
-                ingredients[idx].unit = val;
-            } else if (field === 'qty') {
-                ingredients[idx].quantity = parseFloat(val) || 0;
-            }
-            updateTotals();
-        };
-        window._prepIngDel = (idx) => { ingredients.splice(idx, 1); renderIngs(); updateTotals(); };
+        }).join('') || '<div style="color:var(--text3);font-size:13px;padding:.75rem">Sin ingredientes. Presiona + Agregar.</div>';
     };
 
-    const refreshUI = () => {
-        card.innerHTML = `
-        <div class="modal-header"><h2>${isEdit ? '✏ Editar preparación' : 'Nueva preparación'}</h2><button class="close-btn" onclick="this.closest('[style*=fixed]').remove()">✕</button></div>
+    const updateTotals = () => {
+        const total = ingredients.reduce((s, ing) => {
+            if (ing.isOp === 'gas') return s + (ing.quantity * gasHr);
+            if (ing.isOp === 'mo')  return s + (ing.quantity * moHr);
+            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
+            if (!m) return s;
+            const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
+            return s + getLatestPrice(ing.rawMaterialId) * qb;
+        }, 0);
+        const pesoGrTotal = ingredients.filter(i => !i.isOp).reduce((s, ing) => {
+            const m = rawMaterials.find(x => x.id == ing.rawMaterialId);
+            if (!m) return s;
+            const qb = convertToBaseUnit(m, ing.quantity, ing.unit || m.unit);
+            return s + getWeightInGrams(m, qb);
+        }, 0);
+        const crudoEl  = document.getElementById('prep-peso-crudo');
+        const cocidoEl = document.getElementById('prep-peso-cocido');
+        const pesoCrudo  = crudoEl  ? (parseFloat(crudoEl.value)  || 0) : pesoProteinaCruda;
+        const pesoCocido = cocidoEl ? (parseFloat(cocidoEl.value) || 0) : pesoProteinaCocida;
+        const tp     = document.getElementById('prep-tiene-proteina');
+        const usaProt = (tp ? tp.checked : tieneProteina) && pesoCocido > 0;
+        const pesoBase = usaProt ? pesoCocido : pesoGrTotal;
+        const perGram  = pesoBase > 0 ? total / pesoBase : 0;
+        const merma      = (pesoCrudo > 0 && pesoCocido > 0) ? ((pesoCrudo - pesoCocido) / pesoCrudo * 100).toFixed(1) : null;
+        const rendimiento = merma ? (100 - parseFloat(merma)).toFixed(1) : null;
+        const display = document.getElementById('prep-total-display');
+        if (display) {
+            display.innerHTML = `Costo tanda: <strong>$${Math.round(total).toLocaleString('es-CL')}</strong> · Total ingredientes: ${Math.round(pesoGrTotal).toLocaleString('es-CL')} gr`
+              + (pesoCrudo  > 0 ? ` · Cruda: ${Math.round(pesoCrudo).toLocaleString('es-CL')} gr`  : '')
+              + (pesoCocido > 0 ? ` · Cocida: ${Math.round(pesoCocido).toLocaleString('es-CL')} gr` : '')
+              + (merma      ? ` · Merma: <strong style="color:var(--yellow)">${merma}%</strong> · Rend: <strong style="color:var(--green)">${rendimiento}%</strong>` : '')
+              + ` · <strong style="color:var(--accent)">$${perGram.toFixed(4)}/gr</strong>`;
+        }
+    };
+    window._prepUpdateTotals = updateTotals;
 
-        ${!isMobile ? `
-        <!-- LAYOUT 2 COLUMNAS ESCRITORIO -->
-        <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:.5rem">
-
-          <!-- COLUMNA IZQUIERDA -->
-          <div style="display:flex;flex-direction:column;gap:.875rem">
-            <div>
-              <label>Nombre</label>
-              <input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
-            </div>
-
-            <!-- PROTEÍNA -->
-            <div style="background:var(--bg3);border-radius:10px;padding:1rem;border:1px solid var(--border)">
-              <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:600;letter-spacing:0">
-                <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
-                Tiene proteína principal
-              </label>
-              <div id="prep-peso-cocido-wrap" style="margin-top:.875rem;display:${tieneProteina ? 'block' : 'none'}">
-                <div>
-                  <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cruda (gr)</label>
-                  <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-                  <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo la carne/pollo antes de cocinar.</div>
-                </div>
-                <div style="margin-top:.75rem">
-                  <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cocida (gr)</label>
-                  <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-                  <div style="font-size:11px;color:var(--text3);margin-top:4px">Peso final cocida y escurrida.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- NOTA -->
-            <div>
-              <label>📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
-              <textarea id="prep-nota" rows="4" placeholder="ej: Merma calculada sobre 10kg tapapecho. Actualizar si cambia la proteína." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(notaPrep)}</textarea>
-            </div>
-
-            <!-- TOTALES -->
-            <div id="prep-total-display" style="font-size:12px;font-weight:600;color:var(--text2);line-height:1.7;background:var(--bg3);border-radius:9px;padding:.75rem 1rem;border:1px solid var(--border)"></div>
-
-            <!-- BOTONES -->
-            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:auto">
-              <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
-              <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
-            </div>
+    // Construir el HTML del modal
+    const protFields = `
+        <div id="prep-peso-cocido-wrap" style="display:${tieneProteina?'block':'none'}">
+          <div style="margin-top:.75rem">
+            <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cruda (gr)</label>
+            <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo la carne/pollo antes de cocinar.</div>
           </div>
-
-          <!-- COLUMNA DERECHA: INGREDIENTES -->
-          <div style="display:flex;flex-direction:column">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">
-              <label style="margin:0;font-size:13px;font-weight:700">Ingredientes de la tanda</label>
-              <button class="btn btn-primary btn-sm" id="addIngBtn">+ Agregar</button>
-            </div>
-            <div style="background:var(--bg3);border-radius:7px;padding:.4rem .875rem;font-size:10px;font-weight:700;color:var(--text3);display:flex;gap:.5rem;margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
-              <span style="flex:2.5">Materia prima</span><span style="flex:1;text-align:center">Unidad</span><span style="width:80px;text-align:right">Cantidad</span><span style="width:72px;text-align:right">Subtotal</span><span style="width:24px"></span>
-            </div>
-            <div id="ings-container" style="flex:1;overflow-y:auto;max-height:460px"></div>
+          <div style="margin-top:.75rem">
+            <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cocida (gr)</label>
+            <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Peso final cocida y escurrida.</div>
           </div>
-        </div>
+        </div>`;
 
-        ` : `
-        <!-- LAYOUT MÓVIL (1 columna) -->
+    const modalHTML = isMobile ? `
+        <div class="modal-header"><h2>${isEdit?'✏ Editar preparación':'Nueva preparación'}</h2><button class="close-btn" onclick="document.getElementById('_prep_modal_wrap').remove()">✕</button></div>
         <label>Nombre</label><input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
-
         <div style="background:var(--bg3);border-radius:10px;padding:.875rem;margin-top:1rem;border:1px solid var(--border)">
           <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:600;letter-spacing:0">
-            <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+            <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina?'checked':''} onchange="window._prepToggleProteina(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
             Tiene proteína principal
           </label>
-          <div id="prep-peso-cocido-wrap" style="margin-top:.75rem;display:${tieneProteina ? 'block' : 'none'}">
-            <div class="form-row" style="margin-bottom:.5rem">
-              <div>
-                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cruda (gr)</label>
-                <input type="number" id="prep-peso-crudo" value="${pesoProteinaCruda||''}" placeholder="ej: 10000" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-              </div>
-              <div>
-                <label style="margin:0 0 5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px">Proteína cocida (gr)</label>
-                <input type="number" id="prep-peso-cocido" value="${pesoProteinaCocida||''}" placeholder="ej: 4550" min="0" step="1" oninput="window._prepUpdateTotals&&window._prepUpdateTotals()">
-              </div>
-            </div>
-          </div>
+          ${protFields}
         </div>
-
         <div style="display:flex;justify-content:space-between;align-items:center;margin:.875rem 0 .4rem">
-          <label style="margin:0">Ingredientes de la tanda</label>
-          <button class="btn btn-ghost btn-sm" id="addIngBtn">+ Agregar</button>
+          <label style="margin:0">Ingredientes</label>
+          <button class="btn btn-ghost btn-sm" onclick="window._prepAddIng()">+ Agregar</button>
         </div>
         <div id="ings-container" style="max-height:260px;overflow-y:auto"></div>
         <div id="prep-total-display" style="margin-top:.5rem;font-size:12px;font-weight:600;color:var(--text2);text-align:right;line-height:1.6"></div>
         <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
         <textarea id="prep-nota" rows="2" placeholder="ej: Merma calculada sobre 10kg tapapecho." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(notaPrep)}</textarea>
         <div style="display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end">
-          <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
-          <button class="btn btn-primary" id="savePrepBtn">✓ Guardar</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('_prep_modal_wrap').remove()">Cancelar</button>
+          <button class="btn btn-primary" onclick="window._prepSave()">✓ Guardar</button>
         </div>
-        `}`;
+    ` : `
+        <div class="modal-header"><h2>${isEdit?'✏ Editar preparación':'Nueva preparación'}</h2><button class="close-btn" onclick="document.getElementById('_prep_modal_wrap').remove()">✕</button></div>
+        <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:.5rem">
+          <div style="display:flex;flex-direction:column;gap:.875rem">
+            <div>
+              <label>Nombre</label>
+              <input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
+            </div>
+            <div style="background:var(--bg3);border-radius:10px;padding:1rem;border:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:600;letter-spacing:0">
+                <input type="checkbox" id="prep-tiene-proteina" ${tieneProteina?'checked':''} onchange="window._prepToggleProteina(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+                Tiene proteína principal
+              </label>
+              ${protFields}
+            </div>
+            <div>
+              <label>📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
+              <textarea id="prep-nota" rows="4" placeholder="ej: Merma calculada sobre 10kg tapapecho." style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:vertical;line-height:1.5">${escapeHtml(notaPrep)}</textarea>
+            </div>
+            <div id="prep-total-display" style="font-size:12px;font-weight:600;color:var(--text2);line-height:1.7;background:var(--bg3);border-radius:9px;padding:.75rem 1rem;border:1px solid var(--border)"></div>
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:auto">
+              <button class="btn btn-ghost" onclick="document.getElementById('_prep_modal_wrap').remove()">Cancelar</button>
+              <button class="btn btn-primary" onclick="window._prepSave()">✓ Guardar</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">
+              <label style="margin:0;font-size:13px;font-weight:700">Ingredientes de la tanda</label>
+              <button class="btn btn-primary btn-sm" onclick="window._prepAddIng()">+ Agregar</button>
+            </div>
+            <div style="background:var(--bg3);border-radius:7px;padding:.4rem .875rem;font-size:10px;font-weight:700;color:var(--text3);display:flex;gap:.5rem;margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
+              <span style="flex:2.5">Materia prima</span><span style="flex:1;text-align:center">Unidad</span><span style="width:80px;text-align:right">Cantidad</span><span style="width:72px;text-align:right">Subtotal</span><span style="width:32px"></span>
+            </div>
+            <div id="ings-container" style="flex:1;overflow-y:auto;max-height:460px"></div>
+          </div>
+        </div>
+    `;
 
-        // Checkbox proteína — mostrar/ocultar campo de peso cocido
-        const checkProteina = card.querySelector('#prep-tiene-proteina');
-        if (checkProteina) {
-            checkProteina.addEventListener('change', () => {
-                tieneProteina = checkProteina.checked;
-                const wrap = document.getElementById('prep-peso-cocido-wrap');
-                if (wrap) wrap.style.display = tieneProteina ? 'block' : 'none';
-                updateTotals();
-            });
-        }
-        // Actualizar totales al cambiar pesos de proteína
-        const pesoCocidoInput = card.querySelector('#prep-peso-cocido');
-        if (pesoCocidoInput) {
-            pesoCocidoInput.addEventListener('input', () => {
-                pesoProteinaCocida = parseFloat(pesoCocidoInput.value) || 0;
-                updateTotals();
-            });
-        }
-        const pesoCrudoInput = card.querySelector('#prep-peso-crudo');
-        if (pesoCrudoInput) {
-            pesoCrudoInput.addEventListener('input', () => {
-                pesoProteinaCruda = parseFloat(pesoCrudoInput.value) || 0;
-                updateTotals();
-            });
-        }
-        // Exponer updateTotals globalmente para el oninput inline
-        window._prepUpdateTotals = updateTotals;
+    // Crear y montar el modal
+    const wrap = document.createElement('div');
+    wrap.id = '_prep_modal_wrap';
+    wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;z-index:1000;padding:0;'
+      + (isMobile ? 'align-items:flex-end;justify-content:center' : 'align-items:center;justify-content:center');
+    const card = document.createElement('div');
+    card.className = 'modal';
+    card.style.cssText = isMobile
+      ? 'position:relative;width:100%;max-width:100%;height:96dvh;max-height:96dvh;overflow-y:auto;border-radius:20px 20px 0 0;padding:1.25rem 1rem'
+      : 'position:relative;width:98%;max-width:1100px;height:auto;max-height:92dvh;overflow-y:auto;border-radius:var(--r-xl);padding:1.75rem 2rem';
+    card.innerHTML = modalHTML;
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
 
-        const addBtn = card.querySelector('#addIngBtn');
-        if (addBtn) {
-            addBtn.addEventListener('click', () => {
-                if (rawMaterials.length) {
-                    ingredients.push({ rawMaterialId: rawMaterials[0].id, unit: rawMaterials[0].unit, quantity: 0 });
-                } else {
-                    ingredients.push({ isOp: 'gas', quantity: 1 });
-                }
-                renderIngs();
-                updateTotals();
-            });
-        }
-
-        const saveBtn = card.querySelector('#savePrepBtn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                const newName = document.getElementById('prep-modal-nombre')?.value.trim();
-                if (!newName) {
-                    toast('Ingresa un nombre', '#450a0a', '#fca5a5');
-                    return;
-                }
-                // Leer valores actuales de los campos
-                const checkEl = document.getElementById('prep-tiene-proteina');
-                const pesoCocidoEl = document.getElementById('prep-peso-cocido');
-                const pesoCrudoEl  = document.getElementById('prep-peso-crudo');
-                const finalTieneProteina = checkEl ? checkEl.checked : tieneProteina;
-                const finalPesoCocido = pesoCocidoEl ? (parseFloat(pesoCocidoEl.value) || 0) : pesoProteinaCocida;
-                const finalPesoCrudo  = pesoCrudoEl  ? (parseFloat(pesoCrudoEl.value)  || 0) : pesoProteinaCruda;
-                if (finalTieneProteina && finalPesoCrudo <= 0) {
-                    toast('⚠ Ingresa el peso CRUDO de la proteína (antes de cocinar)', '#422006', '#fbbf24');
-                    pesoCrudoEl?.focus();
-                    return;
-                }
-                if (finalTieneProteina && finalPesoCocido <= 0) {
-                    toast('⚠ Ingresa el peso COCIDO de la proteína (después de escurrir)', '#422006', '#fbbf24');
-                    pesoCocidoEl?.focus();
-                    return;
-                }
-                const finalIngs = ingredients.filter(i => (i.isOp && i.quantity > 0) || (i.rawMaterialId && i.quantity > 0));
-                const finalNota = document.getElementById('prep-nota')?.value.trim() || '';
-                if (isEdit) {
-                    prep.name = newName;
-                    prep.ingredients = finalIngs;
-                    prep.tieneProteina = finalTieneProteina;
-                    prep.pesoProteinaCruda  = finalTieneProteina ? finalPesoCrudo  : 0;
-                    prep.pesoProteinaCocida = finalTieneProteina ? finalPesoCocido : 0;
-                    prep.nota = finalNota;
-                } else {
-                    preparations.push({
-                        id: genId('p'),
-                        name: newName,
-                        ingredients: finalIngs,
-                        tieneProteina: finalTieneProteina,
-                        pesoProteinaCruda:  finalTieneProteina ? finalPesoCrudo  : 0,
-                        pesoProteinaCocida: finalTieneProteina ? finalPesoCocido : 0,
-                        nota: finalNota
-                    });
-                }
-                modal.remove();
-                saveCostosToDB();
-                fullRefresh();
-                toast(`✓ ${newName} guardada`);
-            });
-        }
-
-        // NO llamar renderIngs aquí — el #ings-container aún no está en el DOM
-    };
-
-    modal.appendChild(card);
-    document.body.appendChild(modal);
-    refreshUI();
-    // Renderizar ingredientes después de que refreshUI haya insertado el HTML
-    setTimeout(() => {
-        renderIngs();
-        updateTotals();
-    }, 0);
+    // Renderizar ingredientes — el DOM ya está listo
+    renderIngs();
+    updateTotals();
 }
 window.abrirEditorPreparacion = abrirEditorPreparacion;
 
