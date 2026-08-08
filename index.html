@@ -2602,6 +2602,13 @@ function abrirEditorPreparacion(prepId = null) {
     let pesoProteinaCruda  = prep ? (prep.pesoProteinaCruda  || 0) : 0;
     let notaPrep          = prep ? (prep.nota || '') : '';
 
+    // Escalado de tanda — snapshot de valores base para poder escalar x2, x3, etc.
+    // Solo escala materias primas y pesos de proteína, NUNCA gas ni mano de obra (se ajustan a mano).
+    let scaleFactor = 1;
+    let baseIngQty  = ingredients.map(ing => ing.quantity);
+    let baseCrudo   = pesoProteinaCruda;
+    let baseCocido  = pesoProteinaCocida;
+
     const gasHr = Math.round(getCostoHoraGas());
     const moHr  = parseFloat(document.getElementById('op-mo-hora')?.value) || 4500;
 
@@ -2612,11 +2619,13 @@ function abrirEditorPreparacion(prepId = null) {
         } else {
             ingredients.push({ isOp: 'gas', quantity: 1 });
         }
+        baseIngQty.push(0);
         renderIngs();
         updateTotals();
     };
     window._prepDelIng = (idx) => {
         ingredients.splice(idx, 1);
+        baseIngQty.splice(idx, 1);
         renderIngs();
         updateTotals();
     };
@@ -2625,11 +2634,15 @@ function abrirEditorPreparacion(prepId = null) {
             if (val === '__gas__') ingredients[idx] = { isOp: 'gas', quantity: ingredients[idx]?.quantity || 1 };
             else if (val === '__mo__') ingredients[idx] = { isOp: 'mo', quantity: ingredients[idx]?.quantity || 1 };
             else { const m = rawMaterials.find(x => x.id == val); ingredients[idx] = { rawMaterialId: val, unit: m?.unit || 'kg', quantity: ingredients[idx]?.quantity || 0 }; }
+            baseIngQty[idx] = ingredients[idx].quantity / (scaleFactor || 1);
             renderIngs();
         } else if (field === 'unit') {
             ingredients[idx].unit = val;
         } else if (field === 'qty') {
-            ingredients[idx].quantity = parseFloat(val) || 0;
+            const newQty = parseFloat(val) || 0;
+            ingredients[idx].quantity = newQty;
+            // Si el usuario edita a mano, esa cantidad pasa a ser la nueva base para ese ítem
+            if (!ingredients[idx].isOp) baseIngQty[idx] = newQty / (scaleFactor || 1);
         }
         updateTotals();
     };
@@ -2666,6 +2679,34 @@ function abrirEditorPreparacion(prepId = null) {
         tieneProteina = checked;
         const wrap = document.getElementById('prep-peso-cocido-wrap');
         if (wrap) wrap.style.display = checked ? 'block' : 'none';
+        updateTotals();
+    };
+    // Escala la tanda: multiplica materias primas y pesos de proteína.
+    // Gas y Mano de Obra NUNCA se tocan — se ajustan manualmente.
+    window._prepSetScale = (factor) => {
+        factor = parseFloat(factor) || 1;
+        if (factor <= 0) factor = 1;
+        scaleFactor = factor;
+        ingredients.forEach((ing, idx) => {
+            if (!ing.isOp) {
+                const scaled = baseIngQty[idx] * factor;
+                ing.quantity = Math.round(scaled * 1000) / 1000;
+            }
+            // ing.isOp (gas/mo) queda intacto — el usuario lo ajusta a mano
+        });
+        pesoProteinaCruda  = Math.round(baseCrudo  * factor);
+        pesoProteinaCocida = Math.round(baseCocido * factor);
+        const crudoEl  = document.getElementById('prep-peso-crudo');
+        const cocidoEl = document.getElementById('prep-peso-cocido');
+        if (crudoEl)  crudoEl.value  = pesoProteinaCruda  || '';
+        if (cocidoEl) cocidoEl.value = pesoProteinaCocida || '';
+        const scaleInput = document.getElementById('prep-scale-input');
+        if (scaleInput) scaleInput.value = factor;
+        document.querySelectorAll('.scale-preset-btn').forEach(b => {
+            b.style.background = (parseFloat(b.dataset.factor) === factor) ? 'var(--accent)' : 'transparent';
+            b.style.color = (parseFloat(b.dataset.factor) === factor) ? '#fff' : 'var(--text2)';
+        });
+        renderIngs();
         updateTotals();
     };
 
@@ -2758,6 +2799,19 @@ function abrirEditorPreparacion(prepId = null) {
           </div>
         </div>`;
 
+    const scaleControl = `
+        <div style="background:var(--bg3);border-radius:9px;padding:.625rem .75rem;margin-bottom:.625rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <span style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Escalar tanda</span>
+          <div style="display:flex;gap:.25rem">
+            <button type="button" class="scale-preset-btn" data-factor="0.5" onclick="window._prepSetScale(0.5)" style="border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2)">×0.5</button>
+            <button type="button" class="scale-preset-btn" data-factor="1" onclick="window._prepSetScale(1)" style="border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff">×1</button>
+            <button type="button" class="scale-preset-btn" data-factor="2" onclick="window._prepSetScale(2)" style="border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2)">×2</button>
+            <button type="button" class="scale-preset-btn" data-factor="3" onclick="window._prepSetScale(3)" style="border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2)">×3</button>
+          </div>
+          <input type="number" id="prep-scale-input" value="1" min="0.1" step="0.1" placeholder="x" style="width:64px;flex-shrink:0;font-size:12px;padding:5px 8px" onchange="window._prepSetScale(this.value)">
+          <span style="font-size:10px;color:var(--text3);width:100%">Escala materias primas y pesos de proteína. Gas y mano de obra no se tocan — ajústalos tú.</span>
+        </div>`;
+
     const modalHTML = isMobile ? `
         <div class="modal-header"><h2>${isEdit?'✏ Editar preparación':'Nueva preparación'}</h2><button class="close-btn" onclick="document.getElementById('_prep_modal_wrap').remove()">✕</button></div>
         <label>Nombre</label><input id="prep-modal-nombre" value="${escapeHtml(name)}" placeholder="ej: Carnitas">
@@ -2772,6 +2826,7 @@ function abrirEditorPreparacion(prepId = null) {
           <label style="margin:0">Ingredientes</label>
           <button class="btn btn-ghost btn-sm" onclick="window._prepAddIng()">+ Agregar</button>
         </div>
+        ${scaleControl}
         <div id="ings-container" style="max-height:260px;overflow-y:auto"></div>
         <div id="prep-total-display" style="margin-top:.5rem;font-size:12px;font-weight:600;color:var(--text2);text-align:right;line-height:1.6"></div>
         <label style="margin-top:14px">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
@@ -2810,6 +2865,7 @@ function abrirEditorPreparacion(prepId = null) {
               <label style="margin:0;font-size:13px;font-weight:700">Ingredientes de la tanda</label>
               <button class="btn btn-primary btn-sm" onclick="window._prepAddIng()">+ Agregar</button>
             </div>
+            ${scaleControl}
             <div style="background:var(--bg3);border-radius:7px;padding:.4rem .875rem;font-size:10px;font-weight:700;color:var(--text3);display:flex;gap:.5rem;margin-bottom:.375rem;letter-spacing:.4px;text-transform:uppercase">
               <span style="flex:2.5">Materia prima</span><span style="flex:1;text-align:center">Unidad</span><span style="width:80px;text-align:right">Cantidad</span><span style="width:72px;text-align:right">Subtotal</span><span style="width:32px"></span>
             </div>
