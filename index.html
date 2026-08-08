@@ -11,20 +11,20 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  /* Core palette — deep navy + warm orange */
-  --bg:#080B12;--bg2:#0F1320;--bg3:#161C2D;--card:#0F1320;
-  --accent:#F97316;--accent2:#FB923C;--accent-dim:#7A3B12;--accent-bg:rgba(249,115,22,.07);
-  --green:#22C55E;--green-bg:rgba(34,197,94,.08);--green-bd:rgba(34,197,94,.2);
-  --red:#EF4444;--red-bg:rgba(239,68,68,.08);--red-bd:rgba(239,68,68,.2);
-  --yellow:#EAB308;--yellow-bg:rgba(234,179,8,.08);
-  --blue:#3B82F6;--blue-bg:rgba(59,130,246,.08);
-  --purple:#8B5CF6;--purple-bg:rgba(139,92,246,.08);
-  --teal:#14B8A6;--teal-bg:rgba(20,184,166,.08);
-  --border:rgba(255,255,255,.06);--border-med:rgba(255,255,255,.1);
-  --text:#F1F5F9;--text2:#8892A4;--text3:#4B5566;
+  /* Core palette — gris medio + naranja cálido (modo nocturno suave) */
+  --bg:#2A2E38;--bg2:#333844;--bg3:#3D4350;--card:#333844;
+  --accent:#F97316;--accent2:#FB923C;--accent-dim:#7A3B12;--accent-bg:rgba(249,115,22,.1);
+  --green:#22C55E;--green-bg:rgba(34,197,94,.12);--green-bd:rgba(34,197,94,.28);
+  --red:#EF4444;--red-bg:rgba(239,68,68,.12);--red-bd:rgba(239,68,68,.28);
+  --yellow:#EAB308;--yellow-bg:rgba(234,179,8,.12);
+  --blue:#3B82F6;--blue-bg:rgba(59,130,246,.12);
+  --purple:#8B5CF6;--purple-bg:rgba(139,92,246,.12);
+  --teal:#14B8A6;--teal-bg:rgba(20,184,166,.12);
+  --border:rgba(255,255,255,.10);--border-med:rgba(255,255,255,.16);
+  --text:#F5F7FA;--text2:#A8B0BE;--text3:#7A8394;
   --r-sm:8px;--r-md:12px;--r-lg:16px;--r-xl:24px;
-  --shadow-card:0 1px 3px rgba(0,0,0,.4);
-  --shadow-lift:0 24px 64px rgba(0,0,0,.6);
+  --shadow-card:0 1px 3px rgba(0,0,0,.25);
+  --shadow-lift:0 24px 64px rgba(0,0,0,.45);
   --font:'DM Sans',system-ui,sans-serif;
   --font-mono:'DM Mono',monospace;
 }
@@ -39,7 +39,7 @@ h2{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
 
 /* Topbar */
-.topbar{background:rgba(8,11,18,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;flex-shrink:0;position:sticky;top:0;z-index:50;gap:.5rem}
+.topbar{background:rgba(42,46,56,.9);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;flex-shrink:0;position:sticky;top:0;z-index:50;gap:.5rem}
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;letter-spacing:-.03em;flex-shrink:0}
 .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 0 1px rgba(249,115,22,.3),0 4px 16px rgba(249,115,22,.25)}
 .topbar-actions{display:flex;align-items:center;gap:.35rem;overflow-x:auto;scrollbar-width:none}
@@ -55,13 +55,13 @@ h2{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
 /* Tooltips solo escritorio */
 @media(hover:hover){
   [title]{position:relative}
-  [title]:hover::after{content:attr(title);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#0F1320;color:#F1F5F9;font-size:11px;padding:5px 10px;border-radius:7px;white-space:nowrap;z-index:999;border:1px solid var(--border-med);pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  [title]:hover::after{content:attr(title);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#3D4350;color:#F5F7FA;font-size:11px;padding:5px 10px;border-radius:7px;white-space:nowrap;z-index:999;border:1px solid var(--border-med);pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
   [title]:hover::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--border-med);z-index:999;pointer-events:none}
   input[title]:hover::after,select[title]:hover::after,input[title]:hover::before,select[title]:hover::before{display:none}
 }
 
 /* Bottom nav móvil */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(8,11,18,.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;z-index:80;padding-bottom:env(safe-area-inset-bottom,0px);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(42,46,56,.97);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;z-index:80;padding-bottom:env(safe-area-inset-bottom,0px);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .bottom-nav::-webkit-scrollbar{display:none}
 .bnb{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.6rem .5rem;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;gap:4px;border:none;background:none;transition:color .15s;min-height:62px;min-width:68px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .bnb.active{color:var(--accent)}
@@ -398,6 +398,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <button class="btn btn-primary btn-sm" onclick="nuevaMateriaPrima()" style="white-space:nowrap">+ Nueva MP</button>
       <button class="btn btn-ghost btn-sm" onclick="restaurarPreciosDic2025()" style="white-space:nowrap">🔄 Restaurar precios dic 2025</button>
     </div>
+    <input id="search-mp" placeholder="Buscar materia prima..." style="margin-bottom:.875rem;font-size:13px!important" oninput="renderRawMaterials()">
     <div id="listaMateriasPrimas"></div>
     <div class="card" style="margin-top:1rem">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);padding:.75rem 1rem;border-bottom:1px solid var(--border)">Costos Operacionales</div>
@@ -425,6 +426,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem">
       <button class="btn btn-primary btn-sm" onclick="abrirEditorPreparacion(null)">+ Nueva preparación</button>
     </div>
+    <input id="search-prep" placeholder="Buscar preparación..." style="margin-bottom:.875rem;font-size:13px!important" oninput="renderPreparaciones()">
     <div id="listaPreparaciones"></div>
   </div>
 
@@ -1366,8 +1368,17 @@ async function cambiarFrecuencia(id, freq) {
   if (ing) { ing.frecuencia = freq; await saveDB(); toast(`✓ ${ing.nombre}: ${freq}`); }
 }
 window.cambiarFrecuencia = cambiarFrecuencia;
-function esEditable(ing) { const dia = new Date().getDay(); const esMiercoles = dia === 3; const esSabado = dia === 6; const freq = ing.frecuencia || 'semanal'; if (freq === 'semanal') return esMiercoles || esSabado; if (freq === 'solo-sabados') return esSabado; if (freq === 'quincenal') return esSabado; if (freq === 'mensual') { if (!esSabado) return false; const hoy = new Date(); return hoy.getDate() <= 7; } return false; }
-function proximoConteo(ing) { const freq = ing.frecuencia || 'semanal'; const dia = new Date().getDay(); const hoy = new Date(); if (freq === 'semanal') { if (dia < 3) return 'miércoles'; if (dia < 6) return 'sábado'; return 'miércoles'; } if (freq === 'solo-sabados') { if (dia === 6) return 'hoy'; const prox = new Date(hoy); const diasHastaSab = (6 - dia + 7) % 7 || 7; prox.setDate(hoy.getDate() + diasHastaSab); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'quincenal') return 'sábado'; if (freq === 'mensual') { const f = new Date(hoy); f.setDate(1); while (f.getDay() !== 6) f.setDate(f.getDate()+1); if (f <= hoy) { f.setMonth(f.getMonth()+1); f.setDate(1); while(f.getDay()!==6) f.setDate(f.getDate()+1); } return `${f.getDate()}/${f.getMonth()+1} (1er sáb)`; } return 'próximo conteo'; }
+// Determina si una fecha cae en semana "quincenal" (cada 2 semanas, ancla fija sáb 4-ene-2025)
+function esSemanaQuincenal(fecha) {
+  const referencia = new Date(2025, 0, 4); // sábado ancla — no depende de cuándo se instaló la app
+  referencia.setHours(0,0,0,0);
+  const f = new Date(fecha); f.setHours(0,0,0,0);
+  const diffDias = Math.round((f - referencia) / 86400000);
+  const diffSemanas = Math.floor(diffDias / 7);
+  return diffSemanas % 2 === 0;
+}
+function esEditable(ing) { const hoy = new Date(); const dia = hoy.getDay(); const esMiercoles = dia === 3; const esSabado = dia === 6; const freq = ing.frecuencia || 'semanal'; if (freq === 'semanal') return esMiercoles || esSabado; if (freq === 'solo-sabados') return esSabado; if (freq === 'quincenal') return esSabado && esSemanaQuincenal(hoy); if (freq === 'mensual') { if (!esSabado) return false; return hoy.getDate() <= 7; } return false; }
+function proximoConteo(ing) { const freq = ing.frecuencia || 'semanal'; const dia = new Date().getDay(); const hoy = new Date(); if (freq === 'semanal') { if (dia < 3) return 'miércoles'; if (dia < 6) return 'sábado'; return 'miércoles'; } if (freq === 'solo-sabados') { if (dia === 6) return 'hoy'; const prox = new Date(hoy); const diasHastaSab = (6 - dia + 7) % 7 || 7; prox.setDate(hoy.getDate() + diasHastaSab); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'quincenal') { if (dia === 6 && esSemanaQuincenal(hoy)) return 'hoy'; const prox = new Date(hoy); do { prox.setDate(prox.getDate()+1); } while (!(prox.getDay()===6 && esSemanaQuincenal(prox))); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'mensual') { const f = new Date(hoy); f.setDate(1); while (f.getDay() !== 6) f.setDate(f.getDate()+1); if (f <= hoy) { f.setMonth(f.getMonth()+1); f.setDate(1); while(f.getDay()!==6) f.setDate(f.getDate()+1); } return `${f.getDate()}/${f.getMonth()+1} (1er sáb)`; } return 'próximo conteo'; }
 const FREQ_BADGE = { semanal: 'background:#0f766e;color:#99f6e4', 'solo-sabados': 'background:#854d0e;color:#fde68a', quincenal: 'background:#1e3a5f;color:#93c5fd', mensual: 'background:#3b1d6e;color:#c4b5fd' };
 const FREQ_LABEL = { semanal:'Semanal', 'solo-sabados':'Solo Sáb.', quincenal:'Quincenal', mensual:'Mensual' };
 function abrirStockCocina(id) { const ing = DB.ingredientes.find(i => i.id === id); if (!ing) return; invIngActual = id; document.getElementById('inv-ing-nombre').textContent = ing.nombre; document.getElementById('inv-ing-meta').textContent = `${ing.categoria} · ${ing.unidad}`; document.getElementById('inv-ing-anterior').textContent = `${fmt(ing.stock)} ${ing.unidad}`; document.getElementById('inv-ing-input').value = ''; document.getElementById('inv-modal-diff').innerHTML = ''; document.getElementById('modal-stock-cocina').classList.add('open'); setTimeout(() => document.getElementById('inv-ing-input').focus(), 200); }
@@ -2397,8 +2408,10 @@ window.restaurarPreciosDic2025 = restaurarPreciosDic2025;
 
 function renderRawMaterials() {
   const cont = document.getElementById('listaMateriasPrimas'); if(!cont) return;
-  const items = rawMaterials;
-  if (!items.length) { cont.innerHTML=`<div class="empty">Sin materias primas</div>`; return; }
+  const q = (document.getElementById('search-mp')?.value || '').toLowerCase().trim();
+  const items = q ? rawMaterials.filter(m => m.name.toLowerCase().includes(q)) : rawMaterials;
+  if (!rawMaterials.length) { cont.innerHTML=`<div class="empty">Sin materias primas</div>`; return; }
+  if (!items.length) { cont.innerHTML=`<div class="empty">Sin resultados para "${escapeHtml(q)}"</div>`; return; }
   cont.innerHTML = items.map(mat => {
     const price = getLatestPrice(mat.id);
     const date = mat.priceHistory[mat.priceHistory.length-1]?.date.split(' ')[0]||'';
@@ -2439,8 +2452,10 @@ window.nuevaMateriaPrima = nuevaMateriaPrima;
 function renderPreparaciones() {
   const cont = document.getElementById('listaPreparaciones'); if(!cont) return;
   if (!rawMaterials.length) loadCostosFromDB();
-  const items = preparations;
-  if(!items.length){cont.innerHTML=`<div class="empty">${preparations.length?'Sin resultados':'Crea la primera preparación'}</div>`;return;}
+  const q = (document.getElementById('search-prep')?.value || '').toLowerCase().trim();
+  const items = q ? preparations.filter(p => p.name.toLowerCase().includes(q)) : preparations;
+  if(!preparations.length){cont.innerHTML=`<div class="empty">Crea la primera preparación</div>`;return;}
+  if(!items.length){cont.innerHTML=`<div class="empty">Sin resultados para "${escapeHtml(q)}"</div>`;return;}
   const gasHr = Math.round(getCostoHoraGas());
   const moHr = parseFloat(document.getElementById('op-mo-hora')?.value)||4500;
   cont.innerHTML = items.map(prep => {
