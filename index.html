@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.08c</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09a</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -1553,10 +1553,30 @@ window.ajusteRapido = ajusteRapido;
 function confirmarConteoIng() {
   const v = parseFloat(document.getElementById('conteo-ing-input').value);
   if (isNaN(v) || v < 0) { toast('Ingresa un valor válido', '#450a0a', '#fca5a5'); return; }
-  conteoData[conteoIngActual] = v;
-  closeModal('modal-conteo-ing');
+  const idGuardado = conteoIngActual;
+  conteoData[idGuardado] = v;
   actualizarProgreso();
   renderConteoCards();
+
+  // Modo exprés: al guardar, saltar automáticamente al siguiente ingrediente
+  // pendiente (sin bloquear) para no tener que buscarlo en la lista.
+  const esAdmin = ROL === 'admin';
+  let lista = DB.ingredientes;
+  if (conteoCatFilter !== 'Todos') lista = lista.filter(i => i.categoria === conteoCatFilter);
+  const idxActual = lista.findIndex(i => i.id === idGuardado);
+  let siguiente = null;
+  for (let k = idxActual + 1; k < lista.length; k++) {
+    const cand = lista[k];
+    if (conteoData[cand.id] === undefined && (esAdmin || esEditable(cand))) { siguiente = cand; break; }
+  }
+  if (siguiente) {
+    const pendientes = lista.filter(i => conteoData[i.id] === undefined && (esAdmin || esEditable(i))).length;
+    abrirConteoIng(siguiente.id);
+    toast(`✓ Guardado — siguiente: ${siguiente.nombre} (${pendientes} pendiente${pendientes===1?'':'s'})`);
+  } else {
+    closeModal('modal-conteo-ing');
+    toast('✓ Conteo completo — no quedan ingredientes pendientes');
+  }
 }
 window.confirmarConteoIng = confirmarConteoIng;
 function actualizarProgreso() {
