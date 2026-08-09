@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.08c</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -398,7 +398,11 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <button class="btn btn-primary btn-sm" onclick="nuevaMateriaPrima()" style="white-space:nowrap">+ Nueva MP</button>
       <button class="btn btn-ghost btn-sm" onclick="restaurarPreciosDic2025()" style="white-space:nowrap">🔄 Restaurar precios dic 2025</button>
     </div>
-    <input id="search-mp" placeholder="Buscar materia prima..." style="margin-bottom:.875rem;font-size:13px!important" oninput="renderRawMaterials()">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem">
+      <input id="search-mp" placeholder="Buscar materia prima..." style="flex:1;font-size:13px!important" oninput="renderRawMaterials()" onkeyup="renderRawMaterials()" onchange="renderRawMaterials()">
+      <button class="btn btn-ghost btn-sm" onclick="renderRawMaterials()" title="Actualizar filtro" style="flex-shrink:0">🔄</button>
+    </div>
+    <div id="search-mp-count" style="font-size:11px;color:var(--text3);margin-bottom:.5rem;min-height:14px"></div>
     <div id="listaMateriasPrimas"></div>
     <div class="card" style="margin-top:1rem">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);padding:.75rem 1rem;border-bottom:1px solid var(--border)">Costos Operacionales</div>
@@ -426,7 +430,11 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem">
       <button class="btn btn-primary btn-sm" onclick="abrirEditorPreparacion(null)">+ Nueva preparación</button>
     </div>
-    <input id="search-prep" placeholder="Buscar preparación..." style="margin-bottom:.875rem;font-size:13px!important" oninput="renderPreparaciones()">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem">
+      <input id="search-prep" placeholder="Buscar preparación..." style="flex:1;font-size:13px!important" oninput="renderPreparaciones()" onkeyup="renderPreparaciones()" onchange="renderPreparaciones()">
+      <button class="btn btn-ghost btn-sm" onclick="renderPreparaciones()" title="Actualizar filtro" style="flex-shrink:0">🔄</button>
+    </div>
+    <div id="search-prep-count" style="font-size:11px;color:var(--text3);margin-bottom:.5rem;min-height:14px"></div>
     <div id="listaPreparaciones"></div>
   </div>
 
@@ -2426,6 +2434,8 @@ function renderRawMaterials() {
     console.error('Error filtrando materias primas:', e);
     items = rawMaterials;
   }
+  const countEl = document.getElementById('search-mp-count');
+  if (countEl) countEl.textContent = q ? `${items.length} de ${rawMaterials.length} resultado${items.length===1?'':'s'}` : '';
   if (!rawMaterials.length) { cont.innerHTML=`<div class="empty">Sin materias primas</div>`; return; }
   if (!items.length) { cont.innerHTML=`<div class="empty">Sin resultados para "${escapeHtml(q)}"</div>`; return; }
   cont.innerHTML = items.map(mat => {
@@ -2476,6 +2486,8 @@ function renderPreparaciones() {
     console.error('Error filtrando preparaciones:', e);
     items = preparations;
   }
+  const countEl = document.getElementById('search-prep-count');
+  if (countEl) countEl.textContent = q ? `${items.length} de ${preparations.length} resultado${items.length===1?'':'s'}` : '';
   if(!preparations.length){cont.innerHTML=`<div class="empty">Crea la primera preparación</div>`;return;}
   if(!items.length){cont.innerHTML=`<div class="empty">Sin resultados para "${escapeHtml(q)}"</div>`;return;}
   const gasHr = Math.round(getCostoHoraGas());
@@ -3196,6 +3208,23 @@ function renderCostos() {
   showCostosTab(costosTabActiva);
 }
 window.renderCostos = renderCostos;
+
+// ── Buscadores de Costos: enlace robusto vía addEventListener ──
+// (no depende de atributos inline oninput, evita cualquier problema
+// de binding/timing en navegadores móviles)
+function initCostosSearchListeners() {
+  const searchMp = document.getElementById('search-mp');
+  const searchPrep = document.getElementById('search-prep');
+  if (searchMp && !searchMp._listenerBound) {
+    searchMp.addEventListener('input', renderRawMaterials);
+    searchMp._listenerBound = true;
+  }
+  if (searchPrep && !searchPrep._listenerBound) {
+    searchPrep.addEventListener('input', renderPreparaciones);
+    searchPrep._listenerBound = true;
+  }
+}
+initCostosSearchListeners();
 
 </script>
 </body>
