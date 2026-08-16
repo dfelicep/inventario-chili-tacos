@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09a</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09c</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -2975,6 +2975,26 @@ function renderRecetasSelect(filter='') {
   if(catFilt) items=items.filter(r=>r.categoria===catFilt);
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
   sel.onchange=(e)=>{if(e.target.value)loadRecipeForEditing(e.target.value);};
+
+  // Si la receta cargada actualmente ya no aparece en la lista filtrada
+  // (cambió el filtro de categoría o el texto de búsqueda), no dejar el
+  // formulario mostrando datos de una receta que ya no corresponde.
+  const sigueVisible = items.some(r => r.id == currentEditingRecipeId);
+  if (!sigueVisible) {
+    if (items.length) {
+      currentEditingRecipeId = items[0].id;
+      sel.value = currentEditingRecipeId;
+      loadRecipeForEditing(currentEditingRecipeId);
+    } else {
+      currentEditingRecipeId = null;
+      editingRecipeName = '';
+      editingRecipeComponents = [];
+      sel.value = '';
+      renderEditableRecipeForm();
+      const resultDiv = document.getElementById('costeoRecetaResultados');
+      if (resultDiv) resultDiv.innerHTML = `<div class="empty">Sin recetas en esta categoría</div>`;
+    }
+  }
 }
 
 function loadRecipeForEditing(recipeId) {
@@ -2989,9 +3009,19 @@ function loadRecipeForEditing(recipeId) {
 function renderEditableRecipeForm() {
   const cont=document.getElementById('editableRecetaContainer'); if(!cont) return;
   if(!currentEditingRecipeId){cont.innerHTML=`<div class="empty">Selecciona o crea una receta.</div>`;return;}
-  let html=`<div style="display:flex;gap:.5rem;margin-bottom:.5rem">
-    <div style="flex:1"><label>Nombre</label><input id="editRecipeName" value="${escapeHtml(editingRecipeName)}"></div>
-    <div style="width:120px"><label>Precio venta ($)</label><input id="editRecipePrice" type="number" value="${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.precioVenta||''}"></div>
+  let html=`<div style="display:flex;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
+    <div style="flex:2;min-width:150px"><label>Nombre</label><input id="editRecipeName" value="${escapeHtml(editingRecipeName)}"></div>
+    <div style="width:130px"><label>Categoría</label>
+      <select id="editRecipeCategoria" style="${!menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria?'border-color:rgba(234,179,8,.5)':''}">
+        <option value="" ${!menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria?'selected':''} disabled>-- Elegir --</option>
+        <option value="Burrito" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Burrito'?'selected':''}>Burrito</option>
+        <option value="Taco" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Taco'?'selected':''}>Taco</option>
+        <option value="Quesadilla" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Quesadilla'?'selected':''}>Quesadilla</option>
+        <option value="Nachos" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Nachos'?'selected':''}>Nachos</option>
+        <option value="Otro" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Otro'?'selected':''}>Otro</option>
+      </select>
+    </div>
+    <div style="width:110px"><label>Precio venta ($)</label><input id="editRecipePrice" type="number" value="${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.precioVenta||''}"></div>
   </div>
   <div style="margin-bottom:.625rem">
     <label style="margin-top:0">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
@@ -3126,6 +3156,8 @@ function renderEditableRecipeForm() {
   const saveHandler = () => {
     const newName = document.getElementById('editRecipeName')?.value.trim();
     if (!newName) { alert('Nombre requerido'); return; }
+    const nuevaCategoria = document.getElementById('editRecipeCategoria')?.value || '';
+    if (!nuevaCategoria) { toast('⚠ Elige una categoría antes de guardar', '#422006', '#fbbf24'); return; }
     const precio = parseFloat(document.getElementById('editRecipePrice')?.value) || 0;
     const nuevaNota = document.getElementById('editRecipeNota')?.value.trim() || '';
     const recipe = menuRecipes.find(r => r.id == currentEditingRecipeId);
@@ -3134,6 +3166,7 @@ function renderEditableRecipeForm() {
       recipe.components = editingRecipeComponents.filter(c => c.quantity > 0 && c.id);
       recipe.precioVenta = precio;
       recipe.nota = nuevaNota;
+      recipe.categoria = nuevaCategoria;
     }
     saveCostosToDB();
     editingRecipeName = newName;
@@ -3188,13 +3221,12 @@ function updateRecipeCostDisplay(marginPercent=50) {
 
 function nuevaRecetaMenu() {
   const name=prompt('Nombre de la nueva receta:'); if(!name) return;
-  const categoria=prompt('Categoría (Burrito/Taco/Quesadilla/Nachos/Otro):','Burrito');
-  menuRecipes.push({id:genId('r'),name:name.trim(),categoria:categoria||'Otro',components:[],precioVenta:0});
+  menuRecipes.push({id:genId('r'),name:name.trim(),categoria:'',components:[],precioVenta:0});
   saveCostosToDB(); fullRefresh();
   currentEditingRecipeId=menuRecipes[menuRecipes.length-1].id;
   loadRecipeForEditing(currentEditingRecipeId);
   document.getElementById('selectRecetaCosteo').value=currentEditingRecipeId;
-  toast(`✓ ${name} creada`);
+  toast(`✓ ${name} creada — elige su categoría abajo`);
 }
 window.nuevaRecetaMenu = nuevaRecetaMenu;
 
