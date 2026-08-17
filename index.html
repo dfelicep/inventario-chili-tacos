@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10b</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10c</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -2055,6 +2055,11 @@ let rawMaterials = [];
 let preparations = [];
 let menuRecipes = [];
 let currentEditingRecipeId = null;
+// IVA Chile 19% — el "Precio venta" que se ingresa es el precio BRUTO (con IVA,
+// como se vende al público). El margen y el precio sugerido se calculan
+// siempre sobre el precio NETO (sin IVA), que es lo correcto para medir
+// rentabilidad real del negocio.
+const IVA_RATE = 0.19;
 let editingRecipeName = "";
 let editingRecipeComponents = [];
 let costosTabActiva = 'materias';
@@ -3007,7 +3012,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.10b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10c | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3045,7 +3050,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.10b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10c | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3226,9 +3231,11 @@ function updateRecipeCostDisplay(marginPercent=50) {
   const resultDiv=document.getElementById('costeoRecetaResultados'); if(!resultDiv||!currentEditingRecipeId) return;
   const totalCost=getRecipeTotalCost(editingRecipeComponents);
   const recipe=menuRecipes.find(r=>r.id==currentEditingRecipeId);
-  const precio=recipe?.precioVenta||0;
-  const margenReal=precio>0&&totalCost>0?Math.round(((precio-totalCost)/precio)*100):null;
-  const suggestedPrice=totalCost/(1-marginPercent/100);
+  const precio=recipe?.precioVenta||0; // precio BRUTO (con IVA), tal como se vende
+  const precioNeto=precio/(1+IVA_RATE);
+  const margenReal=precio>0&&totalCost>0?Math.round(((precioNeto-totalCost)/precioNeto)*100):null;
+  const suggestedPriceNeto=totalCost/(1-marginPercent/100);
+  const suggestedPrice=suggestedPriceNeto*(1+IVA_RATE); // precio BRUTO sugerido, con IVA
   const col=margenReal===null?'var(--text2)':margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
   const breakdown=editingRecipeComponents.map(comp=>{
     const cost=getComponentCost(comp);
@@ -3265,6 +3272,7 @@ function updateRecipeCostDisplay(marginPercent=50) {
         <span id="marginPercentLabel" style="font-size:13px;font-weight:800;white-space:nowrap;color:var(--accent)">${marginPercent}%</span>
       </div>
       <div style="font-size:13px;margin-top:.625rem;font-weight:600">Precio sugerido: <span id="suggestedPriceLabel" style="color:var(--accent);font-size:15px;font-weight:800">$${Math.round(suggestedPrice).toLocaleString('es-CL')}</span></div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:3px">Precio final con IVA (19%) incluido · margen calculado sobre el neto</div>
     </div>
     ${recipe?.nota ? `<div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(recipe.nota)}</div>` : ''}`;
 }
@@ -3276,7 +3284,8 @@ function updateSuggestedPriceOnly(marginPercentStr) {
   const marginPercent = parseInt(marginPercentStr) || 0;
   const resultDiv = document.getElementById('costeoRecetaResultados');
   const totalCost = parseFloat(resultDiv?.dataset.totalCost) || 0;
-  const suggestedPrice = totalCost / (1 - marginPercent/100);
+  const suggestedPriceNeto = totalCost / (1 - marginPercent/100);
+  const suggestedPrice = suggestedPriceNeto * (1 + IVA_RATE); // precio bruto, con IVA
   const lbl = document.getElementById('marginPercentLabel');
   const priceEl = document.getElementById('suggestedPriceLabel');
   if (lbl) lbl.textContent = marginPercent + '%';
@@ -3287,9 +3296,10 @@ window.updateSuggestedPriceOnly = updateSuggestedPriceOnly;
 // Vista previa en vivo del precio de venta escrito arriba — se actualiza
 // mientras escribes, sin necesidad de presionar "Guardar receta" primero.
 function previewPrecioVenta(val) {
-  const precio = parseFloat(val) || 0;
+  const precio = parseFloat(val) || 0; // precio BRUTO (con IVA)
+  const precioNeto = precio/(1+IVA_RATE);
   const totalCost = getRecipeTotalCost(editingRecipeComponents);
-  const margenReal = precio>0 && totalCost>0 ? Math.round(((precio-totalCost)/precio)*100) : null;
+  const margenReal = precio>0 && totalCost>0 ? Math.round(((precioNeto-totalCost)/precioNeto)*100) : null;
   const col = margenReal===null?'var(--text2)':margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
   const pv = document.getElementById('precioVentaPreview');
   const mr = document.getElementById('margenRealPreview');
@@ -3325,10 +3335,12 @@ function renderResumenRecetas() {
 
   const rows = items.map(r => {
     const totalCost = getRecipeTotalCost(r.components||[]);
-    const precioActual = r.precioVenta || 0;
-    const margenReal = precioActual>0 && totalCost>0 ? Math.round(((precioActual-totalCost)/precioActual)*100) : null;
+    const precioActual = r.precioVenta || 0; // precio BRUTO (con IVA)
+    const precioActualNeto = precioActual/(1+IVA_RATE);
+    const margenReal = precioActual>0 && totalCost>0 ? Math.round(((precioActualNeto-totalCost)/precioActualNeto)*100) : null;
     const col = margenReal===null ? 'var(--text3)' : margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
-    const precioSugerido = totalCost>0 ? totalCost/(1-margin/100) : 0;
+    const precioSugeridoNeto = totalCost>0 ? totalCost/(1-margin/100) : 0;
+    const precioSugerido = precioSugeridoNeto*(1+IVA_RATE); // precio bruto, con IVA
     const incompleta = !totalCost || !r.categoria;
     return `<tr style="${incompleta?'background:rgba(234,179,8,.06)':''}">
       <td style="font-weight:600;white-space:nowrap">
@@ -3350,7 +3362,7 @@ function renderResumenRecetas() {
   wrap.innerHTML = `
     <table style="width:100%">
       <thead><tr>
-        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta</th><th>Margen real</th><th>Sugerido</th><th></th>
+        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th>Margen real<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(sobre neto)</span></th><th>Sugerido<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
