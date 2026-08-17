@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09e</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09f</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -441,14 +441,15 @@ tr:hover td{background:rgba(255,255,255,.015)}
   <!-- COSTEO RECETAS -->
   <div id="costos-costeo" style="display:none">
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem;flex-wrap:wrap">
-      <input id="searchReceta" placeholder="Buscar receta..." style="flex:2;min-width:150px;font-size:13px!important" oninput="renderRecetasSelect(this.value)">
-      <select id="filterCatReceta" style="flex:1;min-width:130px" onchange="renderRecetasSelect(document.getElementById('searchReceta').value)">
+      <input id="searchReceta" placeholder="Buscar receta..." style="flex:2;min-width:150px;font-size:13px!important" oninput="renderRecetasSelect(this.value)" onkeyup="renderRecetasSelect(this.value)">
+      <select id="filterCatReceta" style="flex:1;min-width:130px" onchange="renderRecetasSelect(document.getElementById('searchReceta').value)" oninput="renderRecetasSelect(document.getElementById('searchReceta').value)">
         <option value="">Todas las categorías</option>
         <option value="Burrito">Burritos</option>
         <option value="Taco">Tacos</option>
         <option value="Quesadilla">Quesadillas</option>
         <option value="Nachos">Nachos</option>
       </select>
+      <button class="btn btn-ghost btn-sm" onclick="renderRecetasSelect(document.getElementById('searchReceta').value)" title="Aplicar filtro">🔄</button>
       <button class="btn btn-primary btn-sm" onclick="nuevaRecetaMenu()" style="white-space:nowrap">+ Nueva receta</button>
     </div>
     <div id="debug-filtro-receta" style="font-size:10.5px;color:#fbbf24;margin-bottom:.75rem;font-family:var(--font-mono)"></div>
@@ -2978,7 +2979,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.09e | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.09f | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3012,6 +3013,12 @@ function loadRecipeForEditing(recipeId) {
   editingRecipeComponents=JSON.parse(JSON.stringify(recipe.components||[]));
   renderEditableRecipeForm();
   updateRecipeCostDisplay(50);
+  // Mantener la línea de diagnóstico sincronizada también al elegir receta manualmente
+  const dbg = document.getElementById('debug-filtro-receta');
+  if (dbg) {
+    const catFilt = document.getElementById('filterCatReceta')?.value || '';
+    dbg.textContent = `🔧 v26.08.09f | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+  }
 }
 
 function renderEditableRecipeForm() {
@@ -3275,6 +3282,8 @@ window.renderCostos = renderCostos;
 function initCostosSearchListeners() {
   const searchMp = document.getElementById('search-mp');
   const searchPrep = document.getElementById('search-prep');
+  const filterCatReceta = document.getElementById('filterCatReceta');
+  const searchReceta = document.getElementById('searchReceta');
   if (searchMp && !searchMp._listenerBound) {
     searchMp.addEventListener('input', renderRawMaterials);
     searchMp._listenerBound = true;
@@ -3283,8 +3292,20 @@ function initCostosSearchListeners() {
     searchPrep.addEventListener('input', renderPreparaciones);
     searchPrep._listenerBound = true;
   }
+  if (filterCatReceta && !filterCatReceta._listenerBound) {
+    filterCatReceta.addEventListener('change', () => renderRecetasSelect(document.getElementById('searchReceta')?.value||''));
+    filterCatReceta.addEventListener('input', () => renderRecetasSelect(document.getElementById('searchReceta')?.value||''));
+    filterCatReceta._listenerBound = true;
+  }
+  if (searchReceta && !searchReceta._listenerBound) {
+    searchReceta.addEventListener('input', (e) => renderRecetasSelect(e.target.value));
+    searchReceta._listenerBound = true;
+  }
 }
 initCostosSearchListeners();
+// Reintentar el binding periódicamente por si el DOM de Costos se recrea o
+// tarda en existir la primera vez (defensivo, no tiene costo real)
+setInterval(initCostosSearchListeners, 2000);
 
 </script>
 </body>
