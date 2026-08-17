@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09g</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10a</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -390,6 +390,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <button class="filter-btn active" id="ctab-materias" onclick="showCostosTab('materias')">Materias primas</button>
     <button class="filter-btn" id="ctab-preparaciones" onclick="showCostosTab('preparaciones')">Preparaciones</button>
     <button class="filter-btn" id="ctab-costeo" onclick="showCostosTab('costeo')">Costeo de recetas</button>
+    <button class="filter-btn" id="ctab-resumen" onclick="showCostosTab('resumen')">Resumen</button>
   </div>
 
   <!-- MATERIAS PRIMAS -->
@@ -460,6 +461,27 @@ tr:hover td{background:rgba(255,255,255,.015)}
     </div>
     <div id="editableRecetaContainer"></div>
     <div id="costeoRecetaResultados" class="card" style="margin-top:1rem;padding:1rem"></div>
+  </div>
+
+  <!-- RESUMEN -->
+  <div id="costos-resumen" style="display:none">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
+      <input id="searchResumen" placeholder="Buscar producto..." style="flex:2;min-width:150px;font-size:13px!important" oninput="renderResumenRecetas()">
+      <select id="filterCatResumen" style="flex:1;min-width:130px" onchange="renderResumenRecetas()">
+        <option value="">Todas las categorías</option>
+        <option value="Burrito">Burritos</option>
+        <option value="Taco">Tacos</option>
+        <option value="Quesadilla">Quesadillas</option>
+        <option value="Nachos">Nachos</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div style="background:var(--bg3);border-radius:10px;padding:.75rem .875rem;margin-bottom:.875rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text3);font-weight:600;white-space:nowrap">Margen objetivo para "Sugerido"</span>
+      <input type="range" id="resumenMarginSlider" min="0" max="90" step="5" value="50" style="flex:1;min-width:100px;accent-color:var(--accent)" oninput="document.getElementById('resumenMarginLabel').textContent=this.value+'%';renderResumenRecetas()">
+      <span id="resumenMarginLabel" style="font-size:13px;font-weight:800;color:var(--accent);white-space:nowrap">50%</span>
+    </div>
+    <div id="resumenTablaWrap" class="card" style="padding:0;overflow-x:auto"></div>
   </div>
 </div>
 
@@ -2980,7 +3002,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.09g | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10a | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3018,7 +3040,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.09g | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10a | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3037,7 +3059,7 @@ function renderEditableRecipeForm() {
         <option value="Otro" ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria==='Otro'?'selected':''}>Otro</option>
       </select>
     </div>
-    <div style="width:110px"><label>Precio venta ($)</label><input id="editRecipePrice" type="number" value="${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.precioVenta||''}"></div>
+    <div style="width:110px"><label>Precio venta ($)</label><input id="editRecipePrice" type="number" value="${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.precioVenta||''}" oninput="previewPrecioVenta(this.value)"></div>
   </div>
   <div style="margin-bottom:.625rem">
     <label style="margin-top:0">📝 Nota interna <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(solo admin)</span></label>
@@ -3208,6 +3230,13 @@ function updateRecipeCostDisplay(marginPercent=50) {
     if(comp.type==='preparation'){const p=preparations.find(x=>x.id==comp.id);return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">${escapeHtml(p?.name||'?')}: ${comp.quantity} ${comp.unit==='grams'?'gr':'porción'}</span><span style="color:var(--accent);font-weight:600">$${Math.round(cost).toLocaleString('es-CL')}</span></div>`;}
     else{const m=rawMaterials.find(x=>x.id==comp.id);return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">${escapeHtml(m?.name||'?')}: ${comp.quantity} ${comp.unit}</span><span style="color:var(--accent);font-weight:600">$${Math.round(cost).toLocaleString('es-CL')}</span></div>`;}
   }).join('');
+
+  // Guardar el costo total en el propio contenedor para que el slider pueda
+  // recalcular el precio sugerido SIN reconstruir todo el bloque — evitar
+  // recrear el <input type="range"> en cada arrastre, que le hacía perder
+  // el "agarre" del mouse/touch y parecía trabado.
+  resultDiv.dataset.totalCost = totalCost;
+
   resultDiv.innerHTML=`
     <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:.625rem">Desglose</div>
     <div style="display:flex;flex-direction:column;gap:.25rem">
@@ -3217,23 +3246,107 @@ function updateRecipeCostDisplay(marginPercent=50) {
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;letter-spacing:-.02em">
         <span>Costo total</span><span style="color:var(--accent)">$${Math.round(totalCost).toLocaleString('es-CL')}</span>
       </div>
-      ${precio>0?`<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;color:var(--text2)">
-        <span>Precio venta</span><span>$${precio.toLocaleString('es-CL')}</span>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;color:var(--text2)">
+        <span>Precio venta</span><span id="precioVentaPreview">${precio>0?'$'+precio.toLocaleString('es-CL'):'—'}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px">
-        <span>Margen real</span><span style="color:${col}">${margenReal}%</span>
-      </div>`:''}
+        <span>Margen real</span><span id="margenRealPreview" style="color:${col}">${margenReal!==null?margenReal+'%':'—'}</span>
+      </div>
     </div>
     <div style="margin-top:1rem;background:var(--bg3);border-radius:10px;padding:.875rem">
       <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--text3);font-weight:600;white-space:nowrap">Margen deseado</span>
-        <input type="range" id="marginSlider" min="0" max="90" step="5" value="${marginPercent}" style="flex:1;accent-color:var(--accent)" oninput="updateRecipeCostDisplay(parseInt(this.value))">
-        <span style="font-size:13px;font-weight:800;white-space:nowrap;color:var(--accent)">${marginPercent}%</span>
+        <input type="range" id="marginSlider" min="0" max="90" step="5" value="${marginPercent}" style="flex:1;accent-color:var(--accent)" oninput="updateSuggestedPriceOnly(this.value)">
+        <span id="marginPercentLabel" style="font-size:13px;font-weight:800;white-space:nowrap;color:var(--accent)">${marginPercent}%</span>
       </div>
-      <div style="font-size:13px;margin-top:.625rem;font-weight:600">Precio sugerido: <span style="color:var(--accent);font-size:15px;font-weight:800">$${Math.round(suggestedPrice).toLocaleString('es-CL')}</span></div>
+      <div style="font-size:13px;margin-top:.625rem;font-weight:600">Precio sugerido: <span id="suggestedPriceLabel" style="color:var(--accent);font-size:15px;font-weight:800">$${Math.round(suggestedPrice).toLocaleString('es-CL')}</span></div>
     </div>
     ${recipe?.nota ? `<div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text3);line-height:1.5">📝 ${escapeHtml(recipe.nota)}</div>` : ''}`;
 }
+
+// Actualización liviana del slider de margen — NO reconstruye el DOM,
+// solo cambia el texto del % y del precio sugerido. Esto es lo que
+// arregla que el slider se sintiera "trabado" al arrastrar.
+function updateSuggestedPriceOnly(marginPercentStr) {
+  const marginPercent = parseInt(marginPercentStr) || 0;
+  const resultDiv = document.getElementById('costeoRecetaResultados');
+  const totalCost = parseFloat(resultDiv?.dataset.totalCost) || 0;
+  const suggestedPrice = totalCost / (1 - marginPercent/100);
+  const lbl = document.getElementById('marginPercentLabel');
+  const priceEl = document.getElementById('suggestedPriceLabel');
+  if (lbl) lbl.textContent = marginPercent + '%';
+  if (priceEl) priceEl.textContent = '$' + Math.round(suggestedPrice).toLocaleString('es-CL');
+}
+window.updateSuggestedPriceOnly = updateSuggestedPriceOnly;
+
+// Vista previa en vivo del precio de venta escrito arriba — se actualiza
+// mientras escribes, sin necesidad de presionar "Guardar receta" primero.
+function previewPrecioVenta(val) {
+  const precio = parseFloat(val) || 0;
+  const totalCost = getRecipeTotalCost(editingRecipeComponents);
+  const margenReal = precio>0 && totalCost>0 ? Math.round(((precio-totalCost)/precio)*100) : null;
+  const col = margenReal===null?'var(--text2)':margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
+  const pv = document.getElementById('precioVentaPreview');
+  const mr = document.getElementById('margenRealPreview');
+  if (pv) pv.textContent = precio>0 ? '$'+precio.toLocaleString('es-CL') : '—';
+  if (mr) { mr.textContent = margenReal!==null ? margenReal+'%' : '—'; mr.style.color = col; }
+}
+window.previewPrecioVenta = previewPrecioVenta;
+
+// ── RESUMEN DE COSTEO — todos los productos con costo y precio sugerido ──
+function renderResumenRecetas() {
+  const wrap = document.getElementById('resumenTablaWrap'); if (!wrap) return;
+  const q = (document.getElementById('searchResumen')?.value || '').toLowerCase().trim();
+  const catFilt = document.getElementById('filterCatResumen')?.value || '';
+  const margin = parseInt(document.getElementById('resumenMarginSlider')?.value) || 50;
+
+  let items = menuRecipes;
+  if (q) items = items.filter(r => (r.name||'').toLowerCase().includes(q));
+  if (catFilt) items = items.filter(r => r.categoria === catFilt);
+  items = [...items].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  if (!menuRecipes.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Aún no hay recetas creadas</div>`; return; }
+  if (!items.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Sin resultados</div>`; return; }
+
+  const rows = items.map(r => {
+    const totalCost = getRecipeTotalCost(r.components||[]);
+    const precioActual = r.precioVenta || 0;
+    const margenReal = precioActual>0 && totalCost>0 ? Math.round(((precioActual-totalCost)/precioActual)*100) : null;
+    const col = margenReal===null ? 'var(--text3)' : margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
+    const precioSugerido = totalCost>0 ? totalCost/(1-margin/100) : 0;
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap">${escapeHtml(r.name)}</td>
+      <td style="color:var(--text3);white-space:nowrap">${r.categoria||'—'}</td>
+      <td style="color:var(--accent);font-weight:600;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(totalCost).toLocaleString('es-CL')}</td>
+      <td style="white-space:nowrap">
+        <input type="number" value="${precioActual||''}" placeholder="0"
+          style="width:95px;padding:5px 8px;font-size:12px"
+          onchange="guardarPrecioResumen('${r.id}', this.value)">
+      </td>
+      <td style="color:${col};font-weight:700;white-space:nowrap">${margenReal!==null?margenReal+'%':'—'}</td>
+      <td style="color:var(--green);font-weight:700;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(precioSugerido).toLocaleString('es-CL')}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table style="width:100%">
+      <thead><tr>
+        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta</th><th>Margen real</th><th>Sugerido</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+window.renderResumenRecetas = renderResumenRecetas;
+
+// Guarda el precio de venta editado directamente desde la tabla de Resumen
+function guardarPrecioResumen(recipeId, val) {
+  const recipe = menuRecipes.find(r => r.id == recipeId); if (!recipe) return;
+  recipe.precioVenta = parseFloat(val) || 0;
+  saveCostosToDB();
+  renderResumenRecetas();
+  toast(`✓ Precio de "${recipe.name}" actualizado`);
+}
+window.guardarPrecioResumen = guardarPrecioResumen;
 
 function nuevaRecetaMenu() {
   const name=prompt('Nombre de la nueva receta:'); if(!name) return;
@@ -3279,13 +3392,14 @@ window.eliminarRecetaActual = eliminarRecetaActual;
 // ── TABS COSTOS ─────────────────────────────
 function showCostosTab(t) {
   costosTabActiva=t;
-  ['materias','preparaciones','costeo'].forEach(id=>{
+  ['materias','preparaciones','costeo','resumen'].forEach(id=>{
     const el=document.getElementById('costos-'+id); if(el) el.style.display=id===t?'':'none';
     const btn=document.getElementById('ctab-'+id); if(btn) btn.classList.toggle('active',id===t);
   });
   if(t==='materias'){renderRawMaterials();cargarCostosOpUI();}
   if(t==='preparaciones')renderPreparaciones();
   if(t==='costeo'){renderRecetasSelect();}
+  if(t==='resumen')renderResumenRecetas();
 }
 window.showCostosTab = showCostosTab;
 function renderCostos() {
@@ -3318,6 +3432,25 @@ function initCostosSearchListeners() {
   if (searchReceta && !searchReceta._listenerBound) {
     searchReceta.addEventListener('input', (e) => renderRecetasSelect(e.target.value));
     searchReceta._listenerBound = true;
+  }
+  const searchResumen = document.getElementById('searchResumen');
+  const filterCatResumen = document.getElementById('filterCatResumen');
+  const resumenMarginSlider = document.getElementById('resumenMarginSlider');
+  if (searchResumen && !searchResumen._listenerBound) {
+    searchResumen.addEventListener('input', renderResumenRecetas);
+    searchResumen._listenerBound = true;
+  }
+  if (filterCatResumen && !filterCatResumen._listenerBound) {
+    filterCatResumen.addEventListener('change', renderResumenRecetas);
+    filterCatResumen._listenerBound = true;
+  }
+  if (resumenMarginSlider && !resumenMarginSlider._listenerBound) {
+    resumenMarginSlider.addEventListener('input', () => {
+      const lbl = document.getElementById('resumenMarginLabel');
+      if (lbl) lbl.textContent = resumenMarginSlider.value + '%';
+      renderResumenRecetas();
+    });
+    resumenMarginSlider._listenerBound = true;
   }
 }
 initCostosSearchListeners();
