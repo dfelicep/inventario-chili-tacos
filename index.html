@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09f</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09g</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -456,6 +456,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div style="display:flex;gap:.5rem;margin-bottom:1rem;align-items:center">
       <select id="selectRecetaCosteo" style="flex:1;font-size:13px!important"></select>
       <button class="btn btn-ghost btn-sm" onclick="duplicarRecetaActual()">⧉ Duplicar</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarRecetaActual()">🗑 Eliminar</button>
     </div>
     <div id="editableRecetaContainer"></div>
     <div id="costeoRecetaResultados" class="card" style="margin-top:1rem;padding:1rem"></div>
@@ -2979,7 +2980,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.09f | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.09g | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3017,7 +3018,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.09f | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.09g | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3257,6 +3258,23 @@ function duplicarRecetaActual() {
   toast(`✓ Duplicada: ${newName}`);
 }
 window.duplicarRecetaActual = duplicarRecetaActual;
+
+function eliminarRecetaActual() {
+  if (!currentEditingRecipeId) { toast('Selecciona una receta primero', '#450a0a', '#fca5a5'); return; }
+  const recipe = menuRecipes.find(r => r.id == currentEditingRecipeId);
+  if (!recipe) return;
+  const ok = confirm(`¿Eliminar la receta "${recipe.name}"?\n\nEsta acción no se puede deshacer.`);
+  if (!ok) return;
+  menuRecipes = menuRecipes.filter(r => r.id != currentEditingRecipeId);
+  currentEditingRecipeId = null;
+  editingRecipeName = '';
+  editingRecipeComponents = [];
+  saveCostosToDB();
+  fullRefresh();
+  renderRecetasSelect(document.getElementById('searchReceta')?.value || '');
+  toast(`✓ "${recipe.name}" eliminada`);
+}
+window.eliminarRecetaActual = eliminarRecetaActual;
 
 // ── TABS COSTOS ─────────────────────────────
 function showCostosTab(t) {
