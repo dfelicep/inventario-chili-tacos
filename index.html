@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09d</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09e</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -440,7 +440,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
   <!-- COSTEO RECETAS -->
   <div id="costos-costeo" style="display:none">
-    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem;flex-wrap:wrap">
       <input id="searchReceta" placeholder="Buscar receta..." style="flex:2;min-width:150px;font-size:13px!important" oninput="renderRecetasSelect(this.value)">
       <select id="filterCatReceta" style="flex:1;min-width:130px" onchange="renderRecetasSelect(document.getElementById('searchReceta').value)">
         <option value="">Todas las categorías</option>
@@ -451,6 +451,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
       </select>
       <button class="btn btn-primary btn-sm" onclick="nuevaRecetaMenu()" style="white-space:nowrap">+ Nueva receta</button>
     </div>
+    <div id="debug-filtro-receta" style="font-size:10.5px;color:#fbbf24;margin-bottom:.75rem;font-family:var(--font-mono)"></div>
     <div style="display:flex;gap:.5rem;margin-bottom:1rem;align-items:center">
       <select id="selectRecetaCosteo" style="flex:1;font-size:13px!important"></select>
       <button class="btn btn-ghost btn-sm" onclick="duplicarRecetaActual()">⧉ Duplicar</button>
@@ -2973,6 +2974,13 @@ function renderRecetasSelect(filter='') {
   let items=menuRecipes;
   if(filter) items=items.filter(r=>r.name.toLowerCase().includes(filter.toLowerCase()));
   if(catFilt) items=items.filter(r=>r.categoria===catFilt);
+
+  // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
+  const dbg = document.getElementById('debug-filtro-receta');
+  if (dbg) {
+    dbg.textContent = `🔧 v26.08.09e | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+  }
+
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
   sel.onchange=(e)=>{if(e.target.value)loadRecipeForEditing(e.target.value);};
 
