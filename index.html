@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10a</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10b</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -476,6 +476,11 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <option value="Otro">Otro</option>
       </select>
     </div>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0 0 .625rem;text-transform:none;font-size:12px;font-weight:500;color:var(--text2)">
+      <input type="checkbox" id="soloIncompletasCheck" onchange="renderResumenRecetas()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--yellow)">
+      Mostrar solo incompletas (sin ingredientes o sin categoría)
+    </label>
+    <div id="resumenAvisoIncompletas" style="font-size:12px;color:var(--yellow);margin-bottom:.75rem;line-height:1.5"></div>
     <div style="background:var(--bg3);border-radius:10px;padding:.75rem .875rem;margin-bottom:.875rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--text3);font-weight:600;white-space:nowrap">Margen objetivo para "Sugerido"</span>
       <input type="range" id="resumenMarginSlider" min="0" max="90" step="5" value="50" style="flex:1;min-width:100px;accent-color:var(--accent)" oninput="document.getElementById('resumenMarginLabel').textContent=this.value+'%';renderResumenRecetas()">
@@ -3002,7 +3007,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.10a | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3040,7 +3045,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.10a | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3299,11 +3304,21 @@ function renderResumenRecetas() {
   const q = (document.getElementById('searchResumen')?.value || '').toLowerCase().trim();
   const catFilt = document.getElementById('filterCatResumen')?.value || '';
   const margin = parseInt(document.getElementById('resumenMarginSlider')?.value) || 50;
+  const soloIncompletas = document.getElementById('soloIncompletasCheck')?.checked || false;
 
   let items = menuRecipes;
   if (q) items = items.filter(r => (r.name||'').toLowerCase().includes(q));
   if (catFilt) items = items.filter(r => r.categoria === catFilt);
+  if (soloIncompletas) items = items.filter(r => !getRecipeTotalCost(r.components||[]) || !r.categoria);
   items = [...items].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  const totalIncompletas = menuRecipes.filter(r => !getRecipeTotalCost(r.components||[]) || !r.categoria).length;
+  const avisoEl = document.getElementById('resumenAvisoIncompletas');
+  if (avisoEl) {
+    avisoEl.innerHTML = totalIncompletas > 0
+      ? `⚠ ${totalIncompletas} receta${totalIncompletas===1?'':'s'} incompleta${totalIncompletas===1?'':'s'} (sin ingredientes o sin categoría) — probablemente copias a medio terminar. Bórralas si no las necesitas.`
+      : '';
+  }
 
   if (!menuRecipes.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Aún no hay recetas creadas</div>`; return; }
   if (!items.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Sin resultados</div>`; return; }
@@ -3314,9 +3329,12 @@ function renderResumenRecetas() {
     const margenReal = precioActual>0 && totalCost>0 ? Math.round(((precioActual-totalCost)/precioActual)*100) : null;
     const col = margenReal===null ? 'var(--text3)' : margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
     const precioSugerido = totalCost>0 ? totalCost/(1-margin/100) : 0;
-    return `<tr>
-      <td style="font-weight:600;white-space:nowrap">${escapeHtml(r.name)}</td>
-      <td style="color:var(--text3);white-space:nowrap">${r.categoria||'—'}</td>
+    const incompleta = !totalCost || !r.categoria;
+    return `<tr style="${incompleta?'background:rgba(234,179,8,.06)':''}">
+      <td style="font-weight:600;white-space:nowrap">
+        ${incompleta?'<span title="Receta incompleta: sin ingredientes o sin categoría" style="color:var(--yellow);margin-right:4px">⚠</span>':''}${escapeHtml(r.name)}
+      </td>
+      <td style="color:var(--text3);white-space:nowrap">${r.categoria||'<span style="color:var(--yellow)">sin categoría</span>'}</td>
       <td style="color:var(--accent);font-weight:600;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(totalCost).toLocaleString('es-CL')}</td>
       <td style="white-space:nowrap">
         <input type="number" value="${precioActual||''}" placeholder="0"
@@ -3325,13 +3343,14 @@ function renderResumenRecetas() {
       </td>
       <td style="color:${col};font-weight:700;white-space:nowrap">${margenReal!==null?margenReal+'%':'—'}</td>
       <td style="color:var(--green);font-weight:700;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(precioSugerido).toLocaleString('es-CL')}</td>
+      <td style="white-space:nowrap"><button class="btn btn-danger btn-sm" onclick="eliminarRecetaDesdeResumen('${r.id}','${escapeHtml(r.name)}')" title="Eliminar receta">🗑</button></td>
     </tr>`;
   }).join('');
 
   wrap.innerHTML = `
     <table style="width:100%">
       <thead><tr>
-        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta</th><th>Margen real</th><th>Sugerido</th>
+        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta</th><th>Margen real</th><th>Sugerido</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -3347,6 +3366,18 @@ function guardarPrecioResumen(recipeId, val) {
   toast(`✓ Precio de "${recipe.name}" actualizado`);
 }
 window.guardarPrecioResumen = guardarPrecioResumen;
+
+// Eliminar una receta directamente desde la tabla de Resumen (con confirmación)
+function eliminarRecetaDesdeResumen(recipeId, nombre) {
+  const ok = confirm(`¿Eliminar la receta "${nombre}"?\n\nEsta acción no se puede deshacer.`);
+  if (!ok) return;
+  menuRecipes = menuRecipes.filter(r => r.id != recipeId);
+  if (currentEditingRecipeId == recipeId) { currentEditingRecipeId = null; editingRecipeName=''; editingRecipeComponents=[]; }
+  saveCostosToDB();
+  renderResumenRecetas();
+  toast(`✓ "${nombre}" eliminada`);
+}
+window.eliminarRecetaDesdeResumen = eliminarRecetaDesdeResumen;
 
 function nuevaRecetaMenu() {
   const name=prompt('Nombre de la nueva receta:'); if(!name) return;
@@ -3451,6 +3482,11 @@ function initCostosSearchListeners() {
       renderResumenRecetas();
     });
     resumenMarginSlider._listenerBound = true;
+  }
+  const soloIncompletasCheck = document.getElementById('soloIncompletasCheck');
+  if (soloIncompletasCheck && !soloIncompletasCheck._listenerBound) {
+    soloIncompletasCheck.addEventListener('change', renderResumenRecetas);
+    soloIncompletasCheck._listenerBound = true;
   }
 }
 initCostosSearchListeners();
