@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09c</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.09d</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -3252,7 +3252,7 @@ function showCostosTab(t) {
   });
   if(t==='materias'){renderRawMaterials();cargarCostosOpUI();}
   if(t==='preparaciones')renderPreparaciones();
-  if(t==='costeo'){renderRecetasSelect();if(menuRecipes.length&&!currentEditingRecipeId){currentEditingRecipeId=menuRecipes[0].id;loadRecipeForEditing(currentEditingRecipeId);}else if(currentEditingRecipeId)loadRecipeForEditing(currentEditingRecipeId);}
+  if(t==='costeo'){renderRecetasSelect();}
 }
 window.showCostosTab = showCostosTab;
 function renderCostos() {
