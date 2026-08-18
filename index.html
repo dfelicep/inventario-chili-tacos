@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10c</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10d</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -3012,7 +3012,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.10c | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10d | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3050,7 +3050,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.10c | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10d | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3342,32 +3342,53 @@ function renderResumenRecetas() {
     const precioSugeridoNeto = totalCost>0 ? totalCost/(1-margin/100) : 0;
     const precioSugerido = precioSugeridoNeto*(1+IVA_RATE); // precio bruto, con IVA
     const incompleta = !totalCost || !r.categoria;
-    return `<tr style="${incompleta?'background:rgba(234,179,8,.06)':''}">
+    const rid = r.id;
+    return `<tr style="${incompleta?'background:rgba(234,179,8,.06)':''}" data-cost="${totalCost}">
       <td style="font-weight:600;white-space:nowrap">
         ${incompleta?'<span title="Receta incompleta: sin ingredientes o sin categoría" style="color:var(--yellow);margin-right:4px">⚠</span>':''}${escapeHtml(r.name)}
       </td>
       <td style="color:var(--text3);white-space:nowrap">${r.categoria||'<span style="color:var(--yellow)">sin categoría</span>'}</td>
       <td style="color:var(--accent);font-weight:600;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(totalCost).toLocaleString('es-CL')}</td>
       <td style="white-space:nowrap">
-        <input type="number" value="${precioActual||''}" placeholder="0"
+        <input type="number" id="precioInput-${rid}" value="${precioActual||''}" placeholder="0"
           style="width:95px;padding:5px 8px;font-size:12px"
-          onchange="guardarPrecioResumen('${r.id}', this.value)">
+          oninput="previewResumenRow('${rid}', this.value)"
+          onchange="guardarPrecioResumen('${rid}', this.value)">
       </td>
-      <td style="color:${col};font-weight:700;white-space:nowrap">${margenReal!==null?margenReal+'%':'—'}</td>
+      <td id="precioNeto-${rid}" style="color:var(--text2);font-weight:600;white-space:nowrap;font-family:var(--font-mono)">${precioActual>0?'$'+Math.round(precioActualNeto).toLocaleString('es-CL'):'—'}</td>
+      <td id="margenReal-${rid}" style="color:${col};font-weight:700;white-space:nowrap">${margenReal!==null?margenReal+'%':'—'}</td>
       <td style="color:var(--green);font-weight:700;white-space:nowrap;font-family:var(--font-mono)">$${Math.round(precioSugerido).toLocaleString('es-CL')}</td>
-      <td style="white-space:nowrap"><button class="btn btn-danger btn-sm" onclick="eliminarRecetaDesdeResumen('${r.id}','${escapeHtml(r.name)}')" title="Eliminar receta">🗑</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-danger btn-sm" onclick="eliminarRecetaDesdeResumen('${rid}','${escapeHtml(r.name)}')" title="Eliminar receta">🗑</button></td>
     </tr>`;
   }).join('');
 
   wrap.innerHTML = `
     <table style="width:100%">
       <thead><tr>
-        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th>Margen real<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(sobre neto)</span></th><th>Sugerido<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th></th>
+        <th>Producto</th><th>Categoría</th><th>Costo</th><th>Precio venta<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th>Sin IVA<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(neto)</span></th><th>Margen real<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(sobre neto)</span></th><th>Sugerido<br><span style="font-weight:400;text-transform:none;font-size:9.5px;color:var(--text3)">(bruto, con IVA)</span></th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
 window.renderResumenRecetas = renderResumenRecetas;
+
+// Actualización liviana de una sola fila del Resumen mientras se escribe el
+// precio de venta — recalcula "Sin IVA" y "Margen real" SIN reconstruir toda
+// la tabla (evita perder el foco del input mientras se escribe).
+function previewResumenRow(recipeId, val) {
+  const precio = parseFloat(val) || 0; // precio BRUTO (con IVA)
+  const precioNeto = precio/(1+IVA_RATE);
+  const inputEl = document.getElementById('precioInput-'+recipeId);
+  const fila = inputEl?.closest('tr');
+  const totalCost = parseFloat(fila?.dataset.cost) || 0;
+  const margenReal = precio>0 && totalCost>0 ? Math.round(((precioNeto-totalCost)/precioNeto)*100) : null;
+  const col = margenReal===null ? 'var(--text3)' : margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
+  const netoEl = document.getElementById('precioNeto-'+recipeId);
+  const margenEl = document.getElementById('margenReal-'+recipeId);
+  if (netoEl) netoEl.textContent = precio>0 ? '$'+Math.round(precioNeto).toLocaleString('es-CL') : '—';
+  if (margenEl) { margenEl.textContent = margenReal!==null ? margenReal+'%' : '—'; margenEl.style.color = col; }
+}
+window.previewResumenRow = previewResumenRow;
 
 // Guarda el precio de venta editado directamente desde la tabla de Resumen
 function guardarPrecioResumen(recipeId, val) {
