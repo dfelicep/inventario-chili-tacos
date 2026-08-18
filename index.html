@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10d</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10e</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -3012,7 +3012,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.10d | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10e | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3050,7 +3050,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.10d | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.10e | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3315,6 +3315,7 @@ function renderResumenRecetas() {
   const catFilt = document.getElementById('filterCatResumen')?.value || '';
   const margin = parseInt(document.getElementById('resumenMarginSlider')?.value) || 50;
   const soloIncompletas = document.getElementById('soloIncompletasCheck')?.checked || false;
+  const isMobile = window.innerWidth < 768;
 
   let items = menuRecipes;
   if (q) items = items.filter(r => (r.name||'').toLowerCase().includes(q));
@@ -3333,6 +3334,54 @@ function renderResumenRecetas() {
   if (!menuRecipes.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Aún no hay recetas creadas</div>`; return; }
   if (!items.length) { wrap.innerHTML = `<div class="empty" style="padding:2rem">Sin resultados</div>`; return; }
 
+  // ── MÓVIL: tarjetas apiladas ──────────────────────
+  if (isMobile) {
+    wrap.style.cssText = 'padding:0;background:transparent;border:none;box-shadow:none';
+    const cards = items.map(r => {
+      const totalCost = getRecipeTotalCost(r.components||[]);
+      const precioActual = r.precioVenta || 0;
+      const precioActualNeto = precioActual/(1+IVA_RATE);
+      const margenReal = precioActual>0 && totalCost>0 ? Math.round(((precioActualNeto-totalCost)/precioActualNeto)*100) : null;
+      const col = margenReal===null ? 'var(--text3)' : margenReal>=65?'#22c55e':margenReal>=50?'#eab308':'#ef4444';
+      const precioSugeridoNeto = totalCost>0 ? totalCost/(1-margin/100) : 0;
+      const precioSugerido = precioSugeridoNeto*(1+IVA_RATE);
+      const incompleta = !totalCost || !r.categoria;
+      const rid = r.id;
+      return `<div class="card" data-cost="${totalCost}" style="margin-bottom:.5rem;padding:.875rem;${incompleta?'border-color:rgba(234,179,8,.35)':''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.625rem">
+          <div style="min-width:0">
+            <div style="font-size:14px;font-weight:700;letter-spacing:-.01em">
+              ${incompleta?'<span style="color:var(--yellow);margin-right:3px">⚠</span>':''}${escapeHtml(r.name)}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.categoria||'<span style="color:var(--yellow)">sin categoría</span>'} · Costo <span style="color:var(--accent);font-weight:600">$${Math.round(totalCost).toLocaleString('es-CL')}</span></div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="eliminarRecetaDesdeResumen('${rid}','${escapeHtml(r.name)}')" style="flex-shrink:0">🗑</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+          <div>
+            <label style="margin:0 0 4px">Precio venta (c/IVA)</label>
+            <input type="number" id="precioInput-${rid}" value="${precioActual||''}" placeholder="0"
+              style="font-size:13px;padding:6px 9px"
+              oninput="previewResumenRow('${rid}', this.value)"
+              onchange="guardarPrecioResumen('${rid}', this.value)">
+          </div>
+          <div>
+            <label style="margin:0 0 4px">Sugerido (${margin}%)</label>
+            <div style="background:var(--bg3);border-radius:9px;padding:8px 9px;font-size:13px;font-weight:700;color:var(--green);font-family:var(--font-mono)">$${Math.round(precioSugerido).toLocaleString('es-CL')}</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:.625rem;padding-top:.625rem;border-top:1px solid var(--border);font-size:12px">
+          <span style="color:var(--text3)">Sin IVA: <strong id="precioNeto-${rid}" style="color:var(--text2);font-family:var(--font-mono)">${precioActual>0?'$'+Math.round(precioActualNeto).toLocaleString('es-CL'):'—'}</strong></span>
+          <span style="color:var(--text3)">Margen: <strong id="margenReal-${rid}" style="color:${col}">${margenReal!==null?margenReal+'%':'—'}</strong></span>
+        </div>
+      </div>`;
+    }).join('');
+    wrap.innerHTML = cards;
+    return;
+  }
+
+  // ── ESCRITORIO: tabla ─────────────────────────────
+  wrap.style.cssText = 'padding:0;overflow-x:auto';
   const rows = items.map(r => {
     const totalCost = getRecipeTotalCost(r.components||[]);
     const precioActual = r.precioVenta || 0; // precio BRUTO (con IVA)
@@ -3526,6 +3575,18 @@ initCostosSearchListeners();
 // Reintentar el binding periódicamente por si el DOM de Costos se recrea o
 // tarda en existir la primera vez (defensivo, no tiene costo real)
 setInterval(initCostosSearchListeners, 2000);
+
+// Re-renderizar el Resumen de recetas si se gira el teléfono o cambia el
+// tamaño de ventana, para alternar entre tabla (escritorio) y tarjetas (móvil)
+let resumenResizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resumenResizeTimer);
+  resumenResizeTimer = setTimeout(() => {
+    if (document.getElementById('costos-resumen')?.style.display !== 'none') {
+      renderResumenRecetas();
+    }
+  }, 250);
+});
 
 </script>
 </body>
