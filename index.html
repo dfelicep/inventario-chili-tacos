@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.10e</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.11a</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -386,11 +386,17 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- PÁGINA COSTOS -->
 <div class="page" id="page-costos">
-  <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap">
-    <button class="filter-btn active" id="ctab-materias" onclick="showCostosTab('materias')">Materias primas</button>
-    <button class="filter-btn" id="ctab-preparaciones" onclick="showCostosTab('preparaciones')">Preparaciones</button>
-    <button class="filter-btn" id="ctab-costeo" onclick="showCostosTab('costeo')">Costeo de recetas</button>
-    <button class="filter-btn" id="ctab-resumen" onclick="showCostosTab('resumen')">Resumen</button>
+  <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;justify-content:space-between">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="filter-btn active" id="ctab-materias" onclick="showCostosTab('materias')">Materias primas</button>
+      <button class="filter-btn" id="ctab-preparaciones" onclick="showCostosTab('preparaciones')">Preparaciones</button>
+      <button class="filter-btn" id="ctab-costeo" onclick="showCostosTab('costeo')">Costeo de recetas</button>
+      <button class="filter-btn" id="ctab-resumen" onclick="showCostosTab('resumen')">Resumen</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btn-auditar-datos" onclick="auditarDatosCostos()" style="white-space:nowrap;position:relative">
+      🔍 Verificar datos
+      <span id="auditBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center"></span>
+    </button>
   </div>
 
   <!-- MATERIAS PRIMAS -->
@@ -3012,7 +3018,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.10e | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.11a | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3050,7 +3056,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.10e | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.11a | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
@@ -3461,6 +3467,119 @@ function eliminarRecetaDesdeResumen(recipeId, nombre) {
 }
 window.eliminarRecetaDesdeResumen = eliminarRecetaDesdeResumen;
 
+// ── AUDITORÍA DE DATOS — revisa Materias primas y Preparaciones en busca ──
+// ── de precios faltantes, referencias rotas y datos incompletos.        ──
+// Calcula la lista de problemas (usada tanto por el badge silencioso como por el modal completo)
+function detectarProblemasCostos() {
+  if (!rawMaterials.length) loadCostosFromDB();
+  const problemas = [];
+
+  rawMaterials.forEach(m => {
+    const price = getLatestPrice(m.id);
+    if (!price || price <= 0) {
+      problemas.push({tipo:'materia', id:m.id, name:m.name, msg:'Sin precio registrado ($0)'});
+    }
+    if (m.unit === 'litro' && !m.density) {
+      problemas.push({tipo:'materia', id:m.id, name:m.name, msg:'Es líquido pero no tiene densidad — los gramos calculados en preparaciones saldrán mal'});
+    }
+    const hist = m.priceHistory || [];
+    if (hist.length) {
+      const ultima = new Date(hist[hist.length-1].date);
+      const diasSinActualizar = Math.floor((new Date() - ultima) / 86400000);
+      if (diasSinActualizar > 60) {
+        problemas.push({tipo:'materia', id:m.id, name:m.name, msg:`Precio sin actualizar hace ${diasSinActualizar} días`});
+      }
+    }
+  });
+
+  preparations.forEach(p => {
+    const cost = getPreparationCost(p.id);
+    if (!cost) {
+      problemas.push({tipo:'preparacion', id:p.id, name:p.name, msg:'Costo $0 — revisa que tenga ingredientes cargados'});
+    }
+    if (p.tieneProteina && (!p.pesoProteinaCruda || !p.pesoProteinaCocida)) {
+      problemas.push({tipo:'preparacion', id:p.id, name:p.name, msg:'Tiene proteína marcada pero falta peso crudo y/o cocido'});
+    }
+    (p.ingredients||[]).forEach(ing => {
+      if (!ing.isOp && ing.rawMaterialId && !rawMaterials.find(m => m.id == ing.rawMaterialId)) {
+        problemas.push({tipo:'preparacion', id:p.id, name:p.name, msg:'Usa una materia prima que ya no existe (fue eliminada)'});
+      }
+    });
+    if (p.tieneProteina && p.pesoProteinaCruda && p.pesoProteinaCocida) {
+      const merma = (1 - p.pesoProteinaCocida/p.pesoProteinaCruda) * 100;
+      if (merma > 85 || merma < 5) {
+        problemas.push({tipo:'preparacion', id:p.id, name:p.name, msg:`Merma de ${merma.toFixed(1)}% — revisa si los pesos crudo/cocido están bien ingresados (valor poco habitual)`});
+      }
+    }
+  });
+
+  return problemas;
+}
+
+// Actualiza solo el contador (badge) del botón, sin abrir el modal — se
+// llama automáticamente al entrar a Costos.
+function actualizarBadgeAuditoria() {
+  const problemas = detectarProblemasCostos();
+  const badge = document.getElementById('auditBadge');
+  if (badge) {
+    if (problemas.length) { badge.style.display='flex'; badge.textContent = problemas.length>9?'9+':problemas.length; }
+    else { badge.style.display='none'; }
+  }
+  return problemas;
+}
+window.actualizarBadgeAuditoria = actualizarBadgeAuditoria;
+
+function auditarDatosCostos() {
+  const problemas = actualizarBadgeAuditoria();
+
+  // Construir y mostrar el modal con los resultados
+  const wrap = document.createElement('div');
+  wrap.id = '_audit_modal_wrap';
+  wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem';
+  const card = document.createElement('div');
+  card.className = 'modal';
+  card.style.cssText = 'position:relative;width:100%;max-width:560px;max-height:85dvh;overflow-y:auto;padding:1.5rem';
+
+  const listaHTML = problemas.length ? problemas.map(p => `
+    <div class="card" style="margin-bottom:.5rem;padding:.75rem .875rem;border-color:rgba(234,179,8,.3)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge ${p.tipo==='materia'?'badge-blue':'badge-orange'}" style="flex-shrink:0">${p.tipo==='materia'?'Materia prima':'Preparación'}</span>
+            <span style="font-size:13px;font-weight:700">${escapeHtml(p.name)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--yellow);margin-top:4px;line-height:1.4">⚠ ${escapeHtml(p.msg)}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="irACorregir('${p.tipo}','${p.id}')">Corregir</button>
+      </div>
+    </div>`).join('') : `<div style="text-align:center;padding:2rem"><div style="font-size:32px;margin-bottom:.5rem">✅</div><div style="font-size:14px;font-weight:700;color:var(--green)">Todo en orden</div><div style="font-size:12px;color:var(--text3);margin-top:4px">No se encontraron problemas en materias primas ni preparaciones</div></div>`;
+
+  card.innerHTML = `
+    <div class="modal-header">
+      <h2>🔍 Verificar datos ${problemas.length?`<span style="color:var(--yellow);font-size:13px;font-weight:600">(${problemas.length})</span>`:''}</h2>
+      <button class="close-btn" onclick="document.getElementById('_audit_modal_wrap').remove()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1rem;line-height:1.5">Revisión automática de materias primas y preparaciones: precios faltantes, datos incompletos y referencias rotas.</div>
+    ${listaHTML}
+  `;
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+}
+window.auditarDatosCostos = auditarDatosCostos;
+
+// Lleva al usuario directo al ítem con problema para corregirlo
+function irACorregir(tipo, id) {
+  document.getElementById('_audit_modal_wrap')?.remove();
+  if (tipo === 'materia') {
+    showCostosTab('materias');
+    editarMP(id);
+  } else {
+    showCostosTab('preparaciones');
+    abrirEditorPreparacion(id);
+  }
+}
+window.irACorregir = irACorregir;
+
 function nuevaRecetaMenu() {
   const name=prompt('Nombre de la nueva receta:'); if(!name) return;
   menuRecipes.push({id:genId('r'),name:name.trim(),categoria:'',components:[],precioVenta:0});
@@ -3518,6 +3637,7 @@ window.showCostosTab = showCostosTab;
 function renderCostos() {
   loadCostosFromDB();
   showCostosTab(costosTabActiva);
+  if (typeof actualizarBadgeAuditoria === 'function') actualizarBadgeAuditoria();
 }
 window.renderCostos = renderCostos;
 
