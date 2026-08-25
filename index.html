@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.11a</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.11b</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -695,7 +695,12 @@ tr:hover td{background:rgba(255,255,255,.015)}
   <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">El stock se sumará automáticamente al inventario</div>
 
   <label>Ingrediente</label>
-  <select id="compra-ing" onchange="updCompraHint()"></select>
+  <div style="position:relative">
+    <input id="compra-ing-search" placeholder="Buscar ingrediente..." autocomplete="off"
+      oninput="filtrarCompraIng(this.value)" onfocus="filtrarCompraIng(this.value)">
+    <input type="hidden" id="compra-ing">
+    <div id="compra-ing-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--bg2);border:1px solid var(--border-med);border-radius:9px;margin-top:4px;max-height:260px;overflow-y:auto;box-shadow:var(--shadow-lift)"></div>
+  </div>
   <div id="compra-stock-actual" style="font-size:11px;color:var(--text2);margin-top:4px"></div>
 
   <label>Cantidad comprada <span id="compra-hint" style="color:var(--accent)"></span></label>
@@ -2020,8 +2025,58 @@ async function elimIng(id) { if (ROL !== 'admin') return; if (!confirm('¿Elimin
 window.elimIng = elimIng;
 
 // REGISTRO DE COMPRAS
-function openCompraModal() { document.getElementById('compra-ing').innerHTML = DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${fmt(i.stock)} ${i.unidad})</option>`).join(''); document.getElementById('compra-qty').value = ''; document.getElementById('compra-nota').value = ''; document.getElementById('compra-nuevo-stock').style.display = 'none'; updCompraHint(); document.getElementById('modal-compra').classList.add('open'); setTimeout(() => document.getElementById('compra-qty').focus(), 200); }
+function openCompraModal() {
+  document.getElementById('compra-ing').value = '';
+  document.getElementById('compra-ing-search').value = '';
+  document.getElementById('compra-ing-dropdown').style.display = 'none';
+  document.getElementById('compra-qty').value = '';
+  document.getElementById('compra-nota').value = '';
+  document.getElementById('compra-nuevo-stock').style.display = 'none';
+  document.getElementById('compra-hint').textContent = '';
+  document.getElementById('compra-stock-actual').textContent = '';
+  document.getElementById('modal-compra').classList.add('open');
+  setTimeout(() => document.getElementById('compra-ing-search').focus(), 200);
+}
 window.openCompraModal = openCompraModal;
+
+// Filtra la lista de ingredientes en vivo mientras se escribe
+function filtrarCompraIng(q) {
+  q = (q||'').toLowerCase().trim();
+  const items = q ? DB.ingredientes.filter(i => i.nombre.toLowerCase().includes(q)) : DB.ingredientes;
+  const dd = document.getElementById('compra-ing-dropdown');
+  if (!items.length) {
+    dd.innerHTML = `<div style="padding:.75rem .875rem;color:var(--text3);font-size:13px">Sin resultados</div>`;
+  } else {
+    dd.innerHTML = items.slice(0, 60).map(i => `
+      <div onclick="seleccionarCompraIng('${i.id}')" style="padding:.625rem .875rem;cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+        <div style="font-size:13px;font-weight:600">${escapeHtmlCompra(i.nombre)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">Stock: ${fmt(i.stock)} ${i.unidad}</div>
+      </div>`).join('');
+  }
+  dd.style.display = 'block';
+}
+window.filtrarCompraIng = filtrarCompraIng;
+
+// Selecciona un ingrediente de la lista filtrada
+function seleccionarCompraIng(id) {
+  const ing = DB.ingredientes.find(i => i.id === id);
+  if (!ing) return;
+  document.getElementById('compra-ing').value = id;
+  document.getElementById('compra-ing-search').value = ing.nombre;
+  document.getElementById('compra-ing-dropdown').style.display = 'none';
+  updCompraHint();
+  document.getElementById('compra-qty').focus();
+}
+window.seleccionarCompraIng = seleccionarCompraIng;
+
+// Cierra el dropdown si se toca fuera de él
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('compra-ing-dropdown');
+  const search = document.getElementById('compra-ing-search');
+  if (dd && dd.style.display === 'block' && !dd.contains(e.target) && e.target !== search) {
+    dd.style.display = 'none';
+  }
+});
 function updCompraHint() { const id = document.getElementById('compra-ing').value; const ing = DB.ingredientes.find(i => i.id === id); if (!ing) return; document.getElementById('compra-hint').textContent = `(en ${ing.unidad})`; document.getElementById('compra-stock-actual').textContent = `Stock actual: ${fmt(ing.stock)} ${ing.unidad}`; actualizarCompraPreview(); }
 window.updCompraHint = updCompraHint;
 function actualizarCompraPreview() { const id = document.getElementById('compra-ing').value; const qty = parseFloat(document.getElementById('compra-qty').value); const ing = DB.ingredientes.find(i => i.id === id); const previewEl = document.getElementById('compra-nuevo-stock'); if (!ing || isNaN(qty) || qty <= 0) { previewEl.style.display = 'none'; return; } const nuevo = parseFloat((ing.stock + qty).toFixed(4)); document.getElementById('compra-stock-antes').textContent = `${fmt(ing.stock)} ${ing.unidad}`; document.getElementById('compra-qty-preview').textContent = `+${fmt(qty)} ${ing.unidad}`; document.getElementById('compra-stock-nuevo').textContent = `${fmt(nuevo)} ${ing.unidad}`; previewEl.style.display = ''; }
@@ -3018,7 +3073,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.11a | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.11b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3056,7 +3111,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.11a | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.11b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
