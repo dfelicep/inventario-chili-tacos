@@ -268,13 +268,14 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.11b</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.12b</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
     <span id="alert-badge" class="badge badge-red" style="display:none">⚠ Stock</span>
     <button class="btn btn-ghost btn-sm" id="btn-movimiento" onclick="openAjusteModal()" style="display:none">+ Movimiento</button>
     <button class="btn btn-primary btn-sm" id="btn-ingrediente" title="Agregar ingrediente" onclick="openIngModal()" style="display:none">+ Inventario</button>
+    <button class="btn btn-ghost btn-sm" id="btn-accesos" title="Ver accesos" onclick="verAccesos()" style="display:none">🔑 Accesos</button>
     <button class="btn btn-success btn-sm" onclick="openCompraModal()">🛒 Compra</button>
     <button class="btn btn-ghost btn-sm" onclick="window.cerrarSesion()" title="Cerrar sesión" style="padding:5px 9px">✕</button>
   </div>
@@ -503,7 +504,10 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <h2>Conteo Semanal</h2>
         <div style="font-size:12px;color:var(--text3);margin-top:2px">Toca un ingrediente para actualizar su stock</div>
       </div>
-      <button class="btn btn-success btn-sm" onclick="guardarConteo()">✓ Guardar</button>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-ghost btn-sm" id="btn-config-conteo" onclick="configurarDiasConteo()" style="display:none" title="Configurar días de conteo">⚙</button>
+        <button class="btn btn-success btn-sm" onclick="guardarConteo()">✓ Guardar</button>
+      </div>
     </div>
     <div style="display:flex;gap:.5rem;align-items:center">
       <div id="conteo-dia-badge" style="flex:1;padding:.5rem .875rem;border-radius:9px;font-size:13px;font-weight:600"></div>
@@ -831,7 +835,7 @@ const PINS = {
 };
 
 // ESTADO GLOBAL
-let DB = { ingredientes: [], recetas: [], historial: [], categorias: ['Proteínas','Fajitas','Secos','Verduras','Lácteos','Salsas','Empaques','Otros'] };
+let DB = { ingredientes: [], recetas: [], historial: [], accesos: [], categorias: ['Proteínas','Fajitas','Secos','Verduras','Lácteos','Salsas','Empaques','Otros'] };
 let ROL = null;
 let syncTimeout = null;
 
@@ -878,6 +882,8 @@ async function saveDB() {
       ingredientes: DB.ingredientes,
       recetas: DB.recetas,
       historial: DB.historial.slice(0, 500),
+      accesos: (DB.accesos || []).slice(0, 200),
+      configConteo: DB.configConteo || { diasSemanal: [3, 6] },
       categorias: DB.categorias,
       costosOp: DB.costosOp,
       rawMaterials: DB.rawMaterials,
@@ -900,6 +906,8 @@ async function loadDB() {
       DB.ingredientes = data.ingredientes || [];
       DB.recetas = data.recetas || [];
       DB.historial = data.historial || [];
+      DB.accesos = data.accesos || [];
+      DB.configConteo = data.configConteo || { diasSemanal: [3, 6] };
       DB.categorias = data.categorias || ['Proteínas','Fajitas','Secos','Verduras','Lácteos','Salsas','Empaques','Otros'];
       DB.costosOp = data.costosOp || {gasCilindro:23000, gasConsumo:0.291, moHora:4500};
       DB.rawMaterials = data.rawMaterials || [];
@@ -941,6 +949,8 @@ function escucharCambios() {
       DB.ingredientes = data.ingredientes || [];
       DB.recetas = data.recetas || [];
       DB.historial = data.historial || [];
+      DB.accesos = data.accesos || DB.accesos || [];
+      DB.configConteo = data.configConteo || DB.configConteo || { diasSemanal: [3, 6] };
       if (Array.isArray(data.categorias) && data.categorias.length > 0) DB.categorias = data.categorias;
       DB.costosOp = data.costosOp || DB.costosOp || {gasCilindro:23000,gasConsumo:0.291,moHora:4500};
       DB.rawMaterials = data.rawMaterials || DB.rawMaterials;
@@ -973,7 +983,11 @@ function validarPin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
     aplicarRol();
-    loadDB().then(() => { escucharCambios(); renderDash(); });
+    loadDB().then(() => {
+      registrarAcceso(ROL);
+      escucharCambios();
+      renderDash();
+    });
   } else {
     document.getElementById('pin-error').textContent = '❌ PIN incorrecto';
     const loading = document.getElementById('pin-loading');
@@ -984,6 +998,65 @@ function validarPin() {
   }
 }
 window._validarPin = validarPin;
+
+// Registra cada inicio de sesión (fecha, hora y rol) para poder revisar
+// después cuándo entró Cocina o Administrador por última vez.
+function registrarAcceso(rol) {
+  if (!Array.isArray(DB.accesos)) DB.accesos = [];
+  DB.accesos.unshift({ rol, fecha: todayStr(), hora: nowTime() });
+  DB.accesos = DB.accesos.slice(0, 200);
+  saveDB();
+}
+window.registrarAcceso = registrarAcceso;
+
+// Muestra el historial de accesos — solo para Administrador.
+function verAccesos() {
+  if (ROL !== 'admin') return;
+  const accesos = DB.accesos || [];
+  const ultimoCocina = accesos.find(a => a.rol === 'cocina' || a.rol === 'op');
+  const ultimoAdmin = accesos.find(a => a.rol === 'admin');
+
+  const wrap = document.createElement('div');
+  wrap.id = '_accesos_modal_wrap';
+  wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem';
+  const card = document.createElement('div');
+  card.className = 'modal';
+  card.style.cssText = 'position:relative;width:100%;max-width:480px;max-height:85dvh;overflow-y:auto;padding:1.5rem';
+
+  const resumenHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.625rem;margin-bottom:1.25rem">
+      <div class="card" style="padding:.875rem">
+        <div style="font-size:10.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">🍳 Último acceso Cocina</div>
+        <div style="font-size:14px;font-weight:700;margin-top:6px">${ultimoCocina ? `${ultimoCocina.fecha} · ${ultimoCocina.hora}` : 'Sin registros'}</div>
+      </div>
+      <div class="card" style="padding:.875rem">
+        <div style="font-size:10.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">👑 Último acceso Admin</div>
+        <div style="font-size:14px;font-weight:700;margin-top:6px">${ultimoAdmin ? `${ultimoAdmin.fecha} · ${ultimoAdmin.hora}` : 'Sin registros'}</div>
+      </div>
+    </div>`;
+
+  const listaHTML = accesos.length ? accesos.slice(0, 100).map(a => {
+    const esCocina = a.rol === 'cocina' || a.rol === 'op';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.625rem .75rem;border-bottom:1px solid var(--border)">
+      <span class="badge ${esCocina?'badge-blue':'badge-orange'}">${esCocina?'🍳 Cocina':'👑 Admin'}</span>
+      <span style="font-size:12.5px;color:var(--text2)">${a.fecha} · ${a.hora}</span>
+    </div>`;
+  }).join('') : `<div class="empty">Aún no hay accesos registrados</div>`;
+
+  card.innerHTML = `
+    <div class="modal-header">
+      <h2>🔑 Historial de accesos</h2>
+      <button class="close-btn" onclick="document.getElementById('_accesos_modal_wrap').remove()">✕</button>
+    </div>
+    ${resumenHTML}
+    <div class="sl">Últimos ${Math.min(accesos.length,100)} accesos</div>
+    <div style="background:var(--bg3);border-radius:10px;overflow:hidden;margin-top:.5rem">${listaHTML}</div>
+  `;
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+}
+window.verAccesos = verAccesos;
+
 window.cerrarSesion = function() {
   ROL = null; window._pin = '';
   actualizarPinDisplay();
@@ -1007,6 +1080,10 @@ function aplicarRol() {
   badge.className = 'role-badge ' + (esAdmin ? 'role-admin' : 'role-op');
   document.getElementById('btn-ingrediente').style.display = esAdmin ? '' : 'none';
   document.getElementById('btn-movimiento').style.display = '';
+  const btnAccesos = document.getElementById('btn-accesos');
+  if (btnAccesos) btnAccesos.style.display = esAdmin ? '' : 'none';
+  const btnConfigConteo = document.getElementById('btn-config-conteo');
+  if (btnConfigConteo) btnConfigConteo.style.display = esAdmin ? '' : 'none';
   const tabsEl = document.querySelectorAll('.tab');
   if (tabsEl[2]) tabsEl[2].style.display = esAdmin ? '' : 'none';
   if (tabsEl[4]) tabsEl[4].style.display = esAdmin ? '' : 'none';
@@ -1213,10 +1290,6 @@ function renderDash() {
   }
   function diasHace(f) { return Math.floor((hoy - f) / 86400000); }
   function diasFaltan(f) { return Math.floor((f - hoy) / 86400000) + 1; }
-  const ultMie = ultimoDia(3);
-  const ultSab = ultimoDia(6);
-  const proxMie = proximoDia(3);
-  const proxSab = proximoDia(6);
   function fechaLocal(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function conteoInfo(fecha, label) {
     const fs = fechaLocal(fecha);
@@ -1227,8 +1300,10 @@ function renderDash() {
       dia: fecha.toLocaleDateString('es-CL',{weekday:'short'}).toUpperCase().slice(0,3),
       num: fecha.getDate() };
   }
-  const ciclos = [conteoInfo(ultMie, 'Conteo Miércoles'), conteoInfo(ultSab, 'Conteo Sábado')].sort((a,b) => new Date(a.fs) - new Date(b.fs));
-  const proximos = [{ ...conteoInfo(proxMie, 'Conteo Miércoles'), esFuturo: true }, { ...conteoInfo(proxSab, 'Conteo Sábado'), esFuturo: true }].sort((a,b) => new Date(a.fs) - new Date(b.fs));
+  const NOMBRES_DIA_LARGO = {0:'Domingo',1:'Lunes',2:'Martes',3:'Miércoles',4:'Jueves',5:'Viernes',6:'Sábado'};
+  const diasConteoConfig = getDiasSemanal();
+  const ciclos = diasConteoConfig.map(d => conteoInfo(ultimoDia(d), `Conteo ${NOMBRES_DIA_LARGO[d]}`)).sort((a,b) => new Date(a.fs) - new Date(b.fs));
+  const proximos = diasConteoConfig.map(d => ({ ...conteoInfo(proximoDia(d), `Conteo ${NOMBRES_DIA_LARGO[d]}`), esFuturo: true })).sort((a,b) => new Date(a.fs) - new Date(b.fs));
   function cicloHTML(c, futuro=false) {
     if (futuro) {
       const faltan = diasFaltan(new Date(c.fs));
@@ -1436,10 +1511,85 @@ function esSemanaQuincenal(fecha) {
   const diffSemanas = Math.floor(diffDias / 7);
   return diffSemanas % 2 === 0;
 }
-function esEditable(ing) { const hoy = new Date(); const dia = hoy.getDay(); const esMiercoles = dia === 3; const esSabado = dia === 6; const freq = ing.frecuencia || 'semanal'; if (freq === 'semanal') return esMiercoles || esSabado; if (freq === 'solo-sabados') return esSabado; if (freq === 'quincenal') return esSabado && esSemanaQuincenal(hoy); if (freq === 'mensual') { if (!esSabado) return false; return hoy.getDate() <= 7; } return false; }
-function proximoConteo(ing) { const freq = ing.frecuencia || 'semanal'; const dia = new Date().getDay(); const hoy = new Date(); if (freq === 'semanal') { if (dia < 3) return 'miércoles'; if (dia < 6) return 'sábado'; return 'miércoles'; } if (freq === 'solo-sabados') { if (dia === 6) return 'hoy'; const prox = new Date(hoy); const diasHastaSab = (6 - dia + 7) % 7 || 7; prox.setDate(hoy.getDate() + diasHastaSab); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'quincenal') { if (dia === 6 && esSemanaQuincenal(hoy)) return 'hoy'; const prox = new Date(hoy); do { prox.setDate(prox.getDate()+1); } while (!(prox.getDay()===6 && esSemanaQuincenal(prox))); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'mensual') { const f = new Date(hoy); f.setDate(1); while (f.getDay() !== 6) f.setDate(f.getDate()+1); if (f <= hoy) { f.setMonth(f.getMonth()+1); f.setDate(1); while(f.getDay()!==6) f.setDate(f.getDate()+1); } return `${f.getDate()}/${f.getMonth()+1} (1er sáb)`; } return 'próximo conteo'; }
+// Días de conteo "2 veces por semana" — configurables por el admin (ver
+// configurarDiasConteo). Por defecto: miércoles y sábado (comportamiento
+// original), pero se puede cambiar libremente sin tocar código.
+function getDiasSemanal() {
+  return (DB.configConteo && Array.isArray(DB.configConteo.diasSemanal) && DB.configConteo.diasSemanal.length)
+    ? DB.configConteo.diasSemanal : [3, 6];
+}
+function esEditable(ing) { const hoy = new Date(); const dia = hoy.getDay(); const esDiaSemanal = getDiasSemanal().includes(dia); const esSabado = dia === 6; const freq = ing.frecuencia || 'semanal'; if (freq === 'semanal') return esDiaSemanal; if (freq === 'solo-sabados') return esSabado; if (freq === 'quincenal') return esSabado && esSemanaQuincenal(hoy); if (freq === 'mensual') { if (!esSabado) return false; return hoy.getDate() <= 7; } return false; }
+function proximoConteo(ing) {
+  const freq = ing.frecuencia || 'semanal'; const dia = new Date().getDay(); const hoy = new Date();
+  const NOMBRES_DIA = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  if (freq === 'semanal') {
+    const diasSemanal = getDiasSemanal();
+    if (diasSemanal.includes(dia)) return 'hoy';
+    const sorted = [...diasSemanal].sort((a,b)=>a-b);
+    const siguiente = sorted.find(d => d > dia);
+    return NOMBRES_DIA[siguiente !== undefined ? siguiente : sorted[0]];
+  }
+  if (freq === 'solo-sabados') { if (dia === 6) return 'hoy'; const prox = new Date(hoy); const diasHastaSab = (6 - dia + 7) % 7 || 7; prox.setDate(hoy.getDate() + diasHastaSab); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'quincenal') { if (dia === 6 && esSemanaQuincenal(hoy)) return 'hoy'; const prox = new Date(hoy); do { prox.setDate(prox.getDate()+1); } while (!(prox.getDay()===6 && esSemanaQuincenal(prox))); return `sáb ${prox.getDate()}/${prox.getMonth()+1}`; } if (freq === 'mensual') { const f = new Date(hoy); f.setDate(1); while (f.getDay() !== 6) f.setDate(f.getDate()+1); if (f <= hoy) { f.setMonth(f.getMonth()+1); f.setDate(1); while(f.getDay()!==6) f.setDate(f.getDate()+1); } return `${f.getDate()}/${f.getMonth()+1} (1er sáb)`; } return 'próximo conteo'; }
 const FREQ_BADGE = { semanal: 'background:#0f766e;color:#99f6e4', 'solo-sabados': 'background:#854d0e;color:#fde68a', quincenal: 'background:#1e3a5f;color:#93c5fd', mensual: 'background:#3b1d6e;color:#c4b5fd' };
 const FREQ_LABEL = { semanal:'Semanal', 'solo-sabados':'Solo Sáb.', quincenal:'Quincenal', mensual:'Mensual' };
+
+// Panel de configuración — elegir libremente qué días de la semana aplican
+// al conteo "Semanal" (los ingredientes con esa frecuencia se desbloquean
+// solo esos días). Solo Administrador.
+function configurarDiasConteo() {
+  if (ROL !== 'admin') return;
+  const diasActuales = getDiasSemanal();
+  const DIAS = [
+    {n:1, label:'Lunes'}, {n:2, label:'Martes'}, {n:3, label:'Miércoles'},
+    {n:4, label:'Jueves'}, {n:5, label:'Viernes'}, {n:6, label:'Sábado'}, {n:0, label:'Domingo'}
+  ];
+
+  const wrap = document.createElement('div');
+  wrap.id = '_config_conteo_wrap';
+  wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem';
+  const card = document.createElement('div');
+  card.className = 'modal';
+  card.style.cssText = 'position:relative;width:100%;max-width:420px;padding:1.5rem';
+
+  card.innerHTML = `
+    <div class="modal-header">
+      <h2>⚙ Días de conteo</h2>
+      <button class="close-btn" onclick="document.getElementById('_config_conteo_wrap').remove()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1rem;line-height:1.5">
+      Elige qué días se desbloquean los ingredientes marcados con frecuencia <strong>"Semanal"</strong>. Puedes elegir cualquier cantidad de días — por ejemplo, lunes y miércoles en vez de miércoles y sábado.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.25rem">
+      ${DIAS.map(d => `
+        <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;padding:.625rem .75rem;background:var(--bg3);border-radius:9px;text-transform:none;font-size:13px;font-weight:600;margin:0">
+          <input type="checkbox" class="dia-conteo-check" value="${d.n}" ${diasActuales.includes(d.n)?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+          ${d.label}
+        </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('_config_conteo_wrap').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarDiasConteo()">✓ Guardar</button>
+    </div>
+  `;
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+}
+window.configurarDiasConteo = configurarDiasConteo;
+
+function guardarDiasConteo() {
+  const checks = document.querySelectorAll('.dia-conteo-check:checked');
+  const dias = Array.from(checks).map(c => parseInt(c.value));
+  if (!dias.length) { toast('⚠ Elige al menos un día', '#422006', '#fbbf24'); return; }
+  if (!DB.configConteo) DB.configConteo = {};
+  DB.configConteo.diasSemanal = dias;
+  saveDB();
+  document.getElementById('_config_conteo_wrap')?.remove();
+  renderConteo();
+  const NOMBRES = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const nombresElegidos = dias.slice().sort((a,b)=>a-b).map(d=>NOMBRES[d]).join(' y ');
+  toast(`✓ Conteo semanal configurado: ${nombresElegidos}`);
+}
+window.guardarDiasConteo = guardarDiasConteo;
 function abrirStockCocina(id) { const ing = DB.ingredientes.find(i => i.id === id); if (!ing) return; invIngActual = id; document.getElementById('inv-ing-nombre').textContent = ing.nombre; document.getElementById('inv-ing-meta').textContent = `${ing.categoria} · ${ing.unidad}`; document.getElementById('inv-ing-anterior').textContent = `${fmt(ing.stock)} ${ing.unidad}`; document.getElementById('inv-ing-input').value = ''; document.getElementById('inv-modal-diff').innerHTML = ''; document.getElementById('modal-stock-cocina').classList.add('open'); setTimeout(() => document.getElementById('inv-ing-input').focus(), 200); }
 window.abrirStockCocina = abrirStockCocina;
 function actualizarInvDiff() { const ing = DB.ingredientes.find(i => i.id === invIngActual); if (!ing) return; const v = parseFloat(document.getElementById('inv-ing-input').value); const el = document.getElementById('inv-modal-diff'); if (isNaN(v)) { el.innerHTML = ''; return; } const diff = parseFloat((v - ing.stock).toFixed(3)); el.innerHTML = diff > 0 ? `<span class="diff-pos">↑ ${fmt(diff)} ${ing.unidad} más</span>` : diff < 0 ? `<span class="diff-neg">↓ ${fmt(Math.abs(diff))} ${ing.unidad} menos</span>` : '<span style="color:var(--text2)">Sin cambio</span>'; }
@@ -1479,24 +1629,22 @@ function renderConteo() {
   conteoData = {};
   actualizarProgreso();
   const dia = new Date().getDay();
-  const esMiercoles = dia === 3;
-  const esSabado = dia === 6;
-  window._conteoTipoActual = esMiercoles ? 'miercoles' : 'sabado';
+  const diasSemanal = getDiasSemanal();
+  const esDiaDeConteo = diasSemanal.includes(dia);
+  const diasNombre = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const nombreHoyCap = diasNombre[dia].charAt(0).toUpperCase() + diasNombre[dia].slice(1);
+  window._conteoTipoActual = `Conteo ${nombreHoyCap}`;
   const badge = document.getElementById('conteo-dia-badge');
   const aviso = document.getElementById('conteo-dia-aviso');
-  const diasNombre = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-  if (esMiercoles) {
-    badge.innerHTML = '📅 Conteo Miércoles — detectado automáticamente';
-    badge.style.cssText = 'flex:1;padding:.5rem .75rem;border-radius:8px;font-size:13px;font-weight:600;background:#134e4a;color:#99f6e4;border:.5px solid #0d9488';
-    if(aviso) aviso.innerHTML = '';
-  } else if (esSabado) {
-    badge.innerHTML = '📅 Conteo Sábado — detectado automáticamente';
+  if (esDiaDeConteo) {
+    badge.innerHTML = `📅 Conteo ${nombreHoyCap} — detectado automáticamente`;
     badge.style.cssText = 'flex:1;padding:.5rem .75rem;border-radius:8px;font-size:13px;font-weight:600;background:#134e4a;color:#99f6e4;border:.5px solid #0d9488';
     if(aviso) aviso.innerHTML = '';
   } else {
     badge.innerHTML = `📅 Hoy es ${diasNombre[dia]} — no es día de conteo`;
     badge.style.cssText = 'flex:1;padding:.5rem .75rem;border-radius:8px;font-size:13px;font-weight:600;background:#22263a;color:#94a3b8;border:.5px solid #2d3352';
-    if(aviso) aviso.innerHTML = `<div style="background:#422006;color:#fde68a;padding:.6rem .75rem;border-radius:8px;font-size:12px;border:.5px solid #92400e;margin-bottom:.75rem">⚠ El conteo se realiza los <strong>miércoles</strong> y <strong>sábados</strong>. Igualmente puedes registrar si es necesario.</div>`;
+    const nombresConfigurados = diasSemanal.slice().sort((a,b)=>a-b).map(d=>diasNombre[d]).join(' y ');
+    if(aviso) aviso.innerHTML = `<div style="background:#422006;color:#fde68a;padding:.6rem .75rem;border-radius:8px;font-size:12px;border:.5px solid #92400e;margin-bottom:.75rem">⚠ El conteo se realiza los <strong>${nombresConfigurados}</strong>. Igualmente puedes registrar si es necesario.</div>`;
   }
   const ultimo = DB.historial.find(h => h.tipo==='conteo' && h.nombre.startsWith('📝'));
   const infoEl = document.getElementById('ultimo-conteo-info');
@@ -1632,8 +1780,7 @@ function actualizarProgreso() {
 async function guardarConteo() {
   const actualizados = Object.entries(conteoData).filter(([id,v]) => !isNaN(v));
   if (!actualizados.length) { toast('No hay cambios que guardar', '#450a0a', '#fca5a5'); return; }
-  const tipo = window._conteoTipoActual || 'sabado';
-  const label = tipo === 'miercoles' ? 'Conteo Miércoles' : 'Conteo Sábado';
+  const label = window._conteoTipoActual || 'Conteo';
   const hora = nowTime(); const fecha = todayStr();
   let cambios = 0;
   actualizados.forEach(([id, nuevoStock]) => {
@@ -3073,7 +3220,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.11b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.12b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3111,7 +3258,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.11b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.12b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
