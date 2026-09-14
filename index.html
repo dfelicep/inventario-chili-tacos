@@ -268,7 +268,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.12b</span></div>
+  <div class="logo"><div class="logo-icon">🌮</div><span>Chili Tacos</span><span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:4px;align-self:flex-end;padding-bottom:2px">v26.08.12c</span></div>
   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
     <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Sincronizado</span></div>
     <span id="role-badge" class="role-badge role-op">Cocina</span>
@@ -1471,7 +1471,7 @@ function renderIngredientes() {
       ? `<div style="display:flex;gap:6px;margin-top:.5rem;align-items:center">
           <select onchange="cambiarFrecuencia('${i.id}',this.value)" onclick="event.stopPropagation()"
             style="flex:1;font-size:11px;padding:4px 6px;border-radius:6px;background:var(--bg3);border:.5px solid var(--border);color:var(--text)">
-            <option value="semanal" ${(i.frecuencia||'semanal')==='semanal'?'selected':''}>📅 Semanal (mié + sáb)</option>
+            <option value="semanal" ${(i.frecuencia||'semanal')==='semanal'?'selected':''}>📅 Semanal (${etiquetaDiasSemanal()})</option>
             <option value="solo-sabados" ${(i.frecuencia||'semanal')==='solo-sabados'?'selected':''}>📅 Solo Sábados</option>
             <option value="quincenal" ${(i.frecuencia||'semanal')==='quincenal'?'selected':''}>📅 Quincenal (c/2 sáb)</option>
             <option value="mensual" ${(i.frecuencia||'semanal')==='mensual'?'selected':''}>📅 Mensual (1er sáb)</option>
@@ -1517,6 +1517,12 @@ function esSemanaQuincenal(fecha) {
 function getDiasSemanal() {
   return (DB.configConteo && Array.isArray(DB.configConteo.diasSemanal) && DB.configConteo.diasSemanal.length)
     ? DB.configConteo.diasSemanal : [3, 6];
+}
+// Etiqueta corta con los días configurados, ej: "lun + jue" — usada en los
+// selectores de frecuencia para que siempre reflejen la configuración actual.
+function etiquetaDiasSemanal() {
+  const ABBR = {0:'dom',1:'lun',2:'mar',3:'mié',4:'jue',5:'vie',6:'sáb'};
+  return getDiasSemanal().slice().sort((a,b)=>a-b).map(d=>ABBR[d]).join(' + ');
 }
 function esEditable(ing) { const hoy = new Date(); const dia = hoy.getDay(); const esDiaSemanal = getDiasSemanal().includes(dia); const esSabado = dia === 6; const freq = ing.frecuencia || 'semanal'; if (freq === 'semanal') return esDiaSemanal; if (freq === 'solo-sabados') return esSabado; if (freq === 'quincenal') return esSabado && esSemanaQuincenal(hoy); if (freq === 'mensual') { if (!esSabado) return false; return hoy.getDate() <= 7; } return false; }
 function proximoConteo(ing) {
@@ -3220,7 +3226,7 @@ function renderRecetasSelect(filter='') {
   // Línea de diagnóstico visible — muestra exactamente qué está viendo el código
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
-    dbg.textContent = `🔧 v26.08.12b | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.12c | filtro categoría="${catFilt||'(todas)'}" | ${items.length} de ${menuRecipes.length} recetas coinciden | cargada actualmente: "${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.name||'ninguna'}" (categoría: ${menuRecipes.find(r=>r.id==currentEditingRecipeId)?.categoria||'-'})`;
   }
 
   sel.innerHTML=`<option value="">-- Elegir receta --</option>`+items.map(r=>`<option value="${r.id}" ${currentEditingRecipeId==r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
@@ -3258,7 +3264,7 @@ function loadRecipeForEditing(recipeId) {
   const dbg = document.getElementById('debug-filtro-receta');
   if (dbg) {
     const catFilt = document.getElementById('filterCatReceta')?.value || '';
-    dbg.textContent = `🔧 v26.08.12b | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
+    dbg.textContent = `🔧 v26.08.12c | filtro categoría="${catFilt||'(todas)'}" | cargada actualmente: "${recipe.name}" (categoría: ${recipe.categoria||'-'})`;
   }
 }
 
